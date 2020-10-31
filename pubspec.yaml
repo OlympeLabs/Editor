@@ -52,8 +52,11 @@ flutter:
   uses-material-design: true
 
   # To add assets to your application, add an assets section, like this:
-  # assets:
-  #  - assets/magenta_arbitrary-image-stylization-v1-256_fp16_prediction_1.tflite
+  assets:
+    - assets/magenta_arbitrary-image-stylization-v1-256_fp16_prediction_1.tflite
+    - assets/magenta_arbitrary-image-stylization-v1-256_fp16_transfer_1.tflite
+    - assets/magenta_arbitrary-image-stylization-v1-256_int8_prediction_1.tflite
+    - assets/magenta_arbitrary-image-stylization-v1-256_int8_transfer_1.tflite
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/assets-and-images/#resolution-aware.

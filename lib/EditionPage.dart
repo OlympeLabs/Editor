@@ -11,22 +11,34 @@ class EditionPage extends StatefulWidget {
 }
 
 class _EditionPageState extends State<EditionPage> {
-  final _filterRowHeight= 50.0;
-
+  final _filterRowHeight= 100.0;
+  final _appbarSize= 80.0;
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Theme.of(context).backgroundColor,
+      appBar: AppBar(
+        title: Container(
+          height: _appbarSize,
+        ),
+      ),
       body: Column(
+        mainAxisAlignment: MainAxisAlignment.start,
         children: [
           //container of the imagePreview
           Container(
-            height: MediaQuery.of(context).size.height - _filterRowHeight,
-            color: Colors.grey,
+            height: MediaQuery.of(context).size.height - (_appbarSize + _filterRowHeight),
+            width: MediaQuery.of(context).size.width,
+            child: Image.memory(widget.imgBytes, fit: BoxFit.contain,),
           ),
           //container of the filters
           Container(
             height: _filterRowHeight,
-            color: Colors.deepOrange,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: 20,
+              separatorBuilder: (context, index)=> Container(height: _filterRowHeight ,width: 50),
+              itemBuilder: (context, index)=> Container(height: 90 , width: 90 ,color: Colors.yellow,),),
 
           )
         ],

@@ -1,6 +1,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:styletranspher/EditionPage.dart';
 
 class MyHomePage extends StatefulWidget {
   MyHomePage({Key key, this.title}) : super(key: key);
@@ -23,23 +24,29 @@ class _MyHomePageState extends State<MyHomePage> {
 
 
   Future<void> pick_image() async {
-    PickedFile image = await _picker.getImage();
-    Navigator.push(context, )
+    PickedFile image = await _picker.getImage(source: ImageSource.gallery);
+    if(image != null){
+      print("image is not null");
+      image.readAsBytes().then((value) => Navigator.push(context, MaterialPageRoute(builder: (context)=> EditionPage(value))));
+    }
   }
 
   @override
   Widget build(BuildContext context) {
 
     return Scaffold(
-      appBar: AppBar(),
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: <Widget>[
-            FloatingActionButton(
-              onPressed: (){print("hello word");},
-              tooltip: 'Select a picture',
-              child: Icon(Icons.image , color: Theme.of(context).buttonColor, size: 50),
+            Container(
+              height:  200,
+              width:  200,
+              child: FloatingActionButton(
+                onPressed: ()=>pick_image(),
+                tooltip: 'Select a picture',
+                child: Icon(Icons.image , color: Theme.of(context).buttonColor, size: 100),
+              ),
             ), // This trailing comma makes auto-formatting nicer for build methods.
           ],
         ),
