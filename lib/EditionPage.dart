@@ -12,8 +12,8 @@ class EditionPage extends StatefulWidget {
 }
 
 class _EditionPageState extends State<EditionPage> {
-  final _filterRowHeight= 110.0;
-  final _appbarSize= 80.0;
+  final _filterRowHeight = 110.0;
+  final _appbarSize = 80.0;
   Uint8List _preview;
   int _selectedStyle;
   Transfer model = Transfer();
@@ -26,14 +26,13 @@ class _EditionPageState extends State<EditionPage> {
     model.loadModel();
     _preview = widget.imgBytes;
     loading = false;
-
   }
 
   Future<Uint8List> applyStyle(int index) async {
-    return model.loadStyleImage("assets/styles/style$index.jpg").then((style)=> model.transfer(widget.imgBytes, style));
+    return model.loadStyleImage("assets/styles/style$index.jpg").then((style) => model.transfer(widget.imgBytes, style));
   }
 
-  void onTapFilter(index){
+  void onTapFilter(index) {
     if (_selectedStyle != index && loading == false) {
       setState(() {
         loading = true;
@@ -41,9 +40,9 @@ class _EditionPageState extends State<EditionPage> {
       });
 
       applyStyle(index).then((value) => setState(() {
-        loading = false;
-        _preview = value;
-      }));
+            loading = false;
+            _preview = value;
+          }));
     }
   }
 
@@ -55,7 +54,6 @@ class _EditionPageState extends State<EditionPage> {
         title: Container(
           height: _appbarSize,
         ),
-    
         backgroundColor: Colors.transparent,
       ),
       body: Column(
@@ -68,18 +66,24 @@ class _EditionPageState extends State<EditionPage> {
             child: Center(
               child: Stack(
                 children: [
-                  Center(child:Image.memory(_preview, fit: BoxFit.contain,)),
-                  loading ? Center(child:Container(
-                    child: Padding(
-                      padding: const EdgeInsets.all(8.0),
-                      child: Text("loading ...", style: TextStyle(fontSize: 30),),
-                    ),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.all(Radius.circular(5)),
-                      color: Colors.white.withAlpha(150)
-                    ),
-                  )
-                  ) : Container(),
+                  Center(
+                      child: Image.memory(
+                    _preview,
+                    fit: BoxFit.contain,
+                  )),
+                  loading
+                      ? Center(
+                          child: Container(
+                          child: Padding(
+                            padding: const EdgeInsets.all(8.0),
+                            child: Text(
+                              "loading ...",
+                              style: TextStyle(fontSize: 30),
+                            ),
+                          ),
+                          decoration: BoxDecoration(borderRadius: BorderRadius.all(Radius.circular(5)), color: Colors.white.withAlpha(150)),
+                        ))
+                      : Container(),
                 ],
               ),
             ),
@@ -88,35 +92,32 @@ class _EditionPageState extends State<EditionPage> {
           Container(
             height: _filterRowHeight,
             child: Center(
-                child : ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  itemCount: nb_style+1,
-                  separatorBuilder: (context, index)=> Container(height: _filterRowHeight ,width: 10),
-                  itemBuilder: (context, index)=>
-                    Padding(
-                      padding: const EdgeInsets.only(top:5.0, bottom: 5.0),
-                      child: Container(
-                          decoration: BoxDecoration(
-                            border: Border.all(
-                            color: _selectedStyle == index ? Colors.white : Colors.black26
-                            ),
-    ),
-                          child: InkWell(
-                            onTap: () => onTapFilter(index),
-                            child: index < nb_style ? Image.asset("assets/styles/style${index}.jpg", fit: BoxFit.contain,) : Icon(Icons.image),
-
-                          ),
-
-                        ),
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: nb_style + 1,
+                separatorBuilder: (context, index) => Container(height: _filterRowHeight, width: 10),
+                itemBuilder: (context, index) => Padding(
+                  padding: const EdgeInsets.only(top: 5.0, bottom: 5.0),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      border: Border.all(color: _selectedStyle == index ? Colors.white : Colors.black26),
                     ),
+                    child: InkWell(
+                      onTap: () => onTapFilter(index),
+                      child: index < nb_style
+                          ? Image.asset(
+                              "assets/styles/style${index}.jpg",
+                              fit: BoxFit.contain,
+                            )
+                          : Icon(Icons.image),
                     ),
+                  ),
+                ),
+              ),
             ),
-
-            ),
+          ),
         ],
       ),
     );
   }
 }
-
-

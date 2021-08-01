@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:math';
 import 'package:image/image.dart';
@@ -51,66 +52,7 @@ class Transfer {
     return styleImageByteData.buffer.asUint8List();
   }
 
-  List<Uint8List> splitImage(img.Image originImage, int originWidth, int originHeight, int nbRow, int nbCol){
-
-    int subWidth = (originWidth/nbRow).ceil();
-    int subHeight = (originHeight/nbCol).ceil();
-
-    int offsetX = 0;
-    int offsetY = 0;
-
-    List<Uint8List> images = List(nbRow * nbCol);
-
-    for(int j = 0 ; j < nbCol ; j++ ){
-      offsetY = j * subHeight;
-      for( int i = 0 ; i < nbRow ; i++){
-        offsetX = i * subWidth;
-        images[nbRow*j + i] = img.encodeJpg(img.copyCrop(originImage, offsetX, offsetY, subWidth, subWidth));
-        print(" split  done ${((nbRow*j + i)/(nbRow*nbCol)) *100 }%");
-
-      }
-    }
-    return images;
-  }
-
-
-  Uint8List joinImages(List<Uint8List> imageSplited, int originWidth, int originHeight, int nbRow, int nbCol){
-    img.Image finalImg = img.Image(originWidth, originHeight);
-    int offsetX = 0;
-    int offsetY = 0;
-    int subWidth = (originWidth/nbRow).ceil();
-    int subHeight = (originHeight/nbCol).ceil();
-
-    for(int j = 0 ; j < nbCol ; j++ ){
-      offsetY = j * subHeight;
-      for( int i = 0 ; i < nbRow ; i++){
-        offsetX = i * subWidth;
-        img.copyInto(finalImg, img.decodeImage(imageSplited[nbRow*j + i]), dstX: offsetX, dstY: offsetY, srcX: 0, srcY: 0, srcH: subHeight, srcW: subWidth);
-        print(" join done ${((nbRow*j + i)/(nbRow*nbCol)) *100 }%");
-      }
-    }
-    return img.encodeJpg(finalImg);
-  }
-
-
-
-  Future<Uint8List> fullSplitTransfer(Uint8List originData, Uint8List styleData) async {
-    img.Image originImage = img.decodeImage(await transfer(originData, styleData));
-    int originWidth = originImage.width;
-    int originHeight = originImage.height;
-    double subdivider = 3;
-
-    int nbRow = ((originWidth/MODEL_TRANSFER_IMAGE_SIZE)/subdivider).ceil();
-    int nbCol = ((originHeight/MODEL_TRANSFER_IMAGE_SIZE)/subdivider).ceil();
-
-    List<Future<Uint8List>> filtredImages = splitImage(originImage, originWidth, originHeight, nbRow, nbCol).map((part) async {
-      return await transfer(part, styleData);
-    }).toList();
-    List<Uint8List> imageParts = await Future.wait(filtredImages);
-    return joinImages(imageParts, originWidth, originHeight, nbRow, nbCol);
-  }
-
-  Uint8List transfer(Uint8List originData, Uint8List styleData) {
+  Uint8List transfer(Uint8List originData, Uint8List styleData){
     var originImage = img.decodeImage(originData);
     var modelTransferImage = img.copyResize(originImage, width: MODEL_TRANSFER_IMAGE_SIZE, height: MODEL_TRANSFER_IMAGE_SIZE, interpolation: Interpolation.nearest);
     var modelTransferInput = _imageToByteListUInt8(modelTransferImage, MODEL_TRANSFER_IMAGE_SIZE, 0, 255);
@@ -125,11 +67,7 @@ class Transfer {
     var outputsForStyle = Map<int, dynamic>();
 
     // style_bottleneck 1 1 1 100
-    var styleBottleneck = 
-      [
-      [
-      [List.generate(100, (index) => 0.0)]
-      ]];
+    var styleBottleneck = [[[List.generate(100, (index) => 0.0)]]];
     outputsForStyle[0] = styleBottleneck;
 
     // style predict model
@@ -138,25 +76,24 @@ class Transfer {
 
     // content_image + styleBottleneck
     var inputsForStyleTransfer = [modelTransferInput, styleBottleneck];
-
     var outputsForStyleTransfer = Map<int, dynamic>();
+
     // stylized_image 1 384 384 3
     var outputImageData = 
-      List.generate(
+      [List.generate(
         MODEL_TRANSFER_IMAGE_SIZE,
           (index) =>
           List.generate(
             MODEL_TRANSFER_IMAGE_SIZE,
               (index) => List.generate(3, (index) => 0.0),
           ),
-      )
-    ;
-    outputsForStyleTransfer[0] = [outputImageData];
+      )];
+    outputsForStyleTransfer[0] = outputImageData;
 
     interpreterTransform.runForMultipleInputs(
       inputsForStyleTransfer, outputsForStyleTransfer);
 
-    var outputImage = _convertArrayToImage([outputImageData], MODEL_TRANSFER_IMAGE_SIZE);
+    var outputImage = _convertArrayToImage(outputImageData, MODEL_TRANSFER_IMAGE_SIZE);
     var rotateOutputImage = img.copyRotate(outputImage, 90);
     var flipOutputImage = img.flipHorizontal(rotateOutputImage);
     var resultImage = img.copyResize(flipOutputImage, width: originImage.width, height: originImage.height);
@@ -199,30 +136,31 @@ class Transfer {
 
    img.Image _byteListUInt8ToImage(Uint8List outputImageData, int inputSize) {
 
-    var buffer = Float32List.view(outputImageData.buffer);
+    var fbuffer = Float32List.view(outputImageData.buffer);
+    print("buffer legth is ${fbuffer.length}/${inputSize*inputSize*3}, shape is ${fbuffer.shape}");
+    List<int> buffer = fbuffer.map((e) => (e*255.0).toInt()).toList();
+    img.Image image = img.Image.fromBytes(inputSize, inputSize, buffer, format: Format.rgb, channels: Channels.rgb );
+    /*
     img.Image image = img.Image.rgb(inputSize, inputSize);
     int pixelIndex = 0;
-    int mini = 255;
-    int maxi = 0;
+    Map<int,int > histo = {};
     for (var x = 0; x < inputSize; x++) {
       for (var y = 0; y < inputSize; y++) {
-        var r = (buffer[pixelIndex++] * 255).toInt();
-        mini = min(r, mini);
-        maxi = max(r, maxi);
+        var r = (buffer[pixelIndex++]);
+        var g = (buffer[pixelIndex++]);
+        var b = (buffer[pixelIndex++]);
+        var lum = ((r + g + b) / 3).toInt() ;
+        histo[lum] = histo[lum] == null ? 0 : histo[lum] + 1 ; 
 
-        var g = (buffer[pixelIndex++] * 255).toInt();
-        mini = min(g, mini);
-        maxi = max(g, maxi);
-
-        var b = (buffer[pixelIndex++] * 255).toInt();
-        mini = min(b, mini);
-        maxi = max(b, maxi);
-
-
-        image.setPixelRgba(x, y, r, g, b);
+        image.setPixelRgba(x, y, r.toInt(), g.toInt(), b.toInt());
       }
     }
-    print("min = $mini max = $maxi");
+    print("index = $pixelIndex \nhisto = \n");
+
+    histo.forEach((key, value) {
+      print("($key) => $value");
+    });
+    */
     return image;
   }
 
@@ -248,17 +186,21 @@ class Transfer {
   }
 
 
-  Uint8List runStyleTransform(styleBottleneck, preprocessedContentImage){
+  Uint8List runStyleTransform(Tensor styleBottleneck, preprocessedContentImage){
     //the model is [interpreterTransform]
     interpreterTransform.allocateTensors();
-    interpreterTransform.getInputTensor(0).setTo(preprocessedContentImage);
-    print(interpreterTransform.getInputTensor(1));
-    interpreterTransform.getInputTensor(1).setTo(styleBottleneck.data);
+    interpreterTransform.getInputTensor(0).setTo(preprocessedContentImage.asFloat32List());
+    print("buffer length ${styleBottleneck.data.buffer.asFloat32List().length}");
+    interpreterTransform.getInputTensor(1).setTo(styleBottleneck.data.buffer.asFloat32List());
+
 
 
     interpreterTransform.invoke();
+
+
     Tensor tensor = interpreterTransform.getOutputTensor(0);
-    print(tensor);
+
+    print("Tensor is : $tensor");
     
     var stylizedImage = tensor.data;
     return stylizedImage;
@@ -281,21 +223,28 @@ class Transfer {
 
     TensorImage originTensorImage = TensorImage.fromImage(originImage);
     TensorImage styleTensorImage = TensorImage.fromImage(originStyleImage);
-
+  
     // style_image 1 256 256 3
-    var preprocessedStyleImage = imageStyleProcessor.process(styleTensorImage).getBuffer();//imagePreprocess(styleData, MODEL_STYLE_IMAGE_SIZE);
-
-
-    var styleBottleneck = runStylePredict(preprocessedStyleImage);
-    print("style bottleNeck computed");
-
+    var preprocessedStyleImage = imageStyleProcessor.process(styleTensorImage).getBuffer(); //imagePreprocess(styleData, MODEL_STYLE_IMAGE_SIZE);
+    //var preprocessedStyleContentImage = imageStyleProcessor.process(originTensorImage).getBuffer();//imagePreprocess(styleData, MODEL_STYLE_IMAGE_SIZE);
     // content_image 384 384 3
     var preprocessedContentImage = imageTransferProcessor.process(originTensorImage).getBuffer();//imagePreprocess(originData, MODEL_TRANSFER_IMAGE_SIZE);
-    var outputImageData = runStyleTransform(styleBottleneck, preprocessedContentImage);
-    print("output Image computed outputImageData = ${outputImageData.lengthInBytes}");
 
-    img.Image image = _byteListUInt8ToImage(outputImageData, MODEL_TRANSFER_IMAGE_SIZE);
-    return img.encodeJpg(image);
+    var styleBottleneck = runStylePredict(preprocessedStyleImage);
+    //var styleContentBottleneck = runStylePredict(preprocessedStyleContentImage);
+
+    print("style bottleNeck computed");
+
+    var outputImageData = runStyleTransform(styleBottleneck, preprocessedContentImage);
+
+    print("output Image computed outputImageData = ${outputImageData.shape}");
+
+    img.Image outputImage = _byteListUInt8ToImage(outputImageData, MODEL_TRANSFER_IMAGE_SIZE);
+    
+    var rotateOutputImage = img.copyRotate(outputImage, 90);
+    var flipOutputImage = img.flipHorizontal(rotateOutputImage);
+    var resultImage = img.copyResize(flipOutputImage, width: MODEL_TRANSFER_IMAGE_SIZE, height: MODEL_TRANSFER_IMAGE_SIZE);
+    return img.encodeJpg(resultImage);
   }
 
 
