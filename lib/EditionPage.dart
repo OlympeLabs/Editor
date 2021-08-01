@@ -1,9 +1,6 @@
-import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
-import 'package:permission_handler/permission_handler.dart';
 import 'package:styletranspher/Transfer.dart';
 
 class EditionPage extends StatefulWidget {
@@ -29,14 +26,25 @@ class _EditionPageState extends State<EditionPage> {
     model.loadModel();
     _preview = widget.imgBytes;
     loading = false;
+
   }
 
-  Future<void> applyStyle(int index, {Uint8List style}) async {
-    if(style== null)
-      style = await model.loadStyleImage("assets/styles/style${index}.jpg");
-    model.transfer(widget.imgBytes,style ).then((filteredImg){
-        _preview = filteredImg;
-    });
+  Future<Uint8List> applyStyle(int index) async {
+    return model.loadStyleImage("assets/styles/style$index.jpg").then((style)=> model.transfer(widget.imgBytes, style));
+  }
+
+  void onTapFilter(index){
+    if (_selectedStyle != index && loading == false) {
+      setState(() {
+        loading = true;
+        _selectedStyle = index;
+      });
+
+      applyStyle(index).then((value) => setState(() {
+        loading = false;
+        _preview = value;
+      }));
+    }
   }
 
   @override
@@ -47,6 +55,7 @@ class _EditionPageState extends State<EditionPage> {
         title: Container(
           height: _appbarSize,
         ),
+    
         backgroundColor: Colors.transparent,
       ),
       body: Column(
@@ -93,34 +102,7 @@ class _EditionPageState extends State<EditionPage> {
                             ),
     ),
                           child: InkWell(
-                            onTap: () async {
-                              if (_selectedStyle != index && loading == false){
-                                if(index <nb_style) {
-                                  setState(() {
-                                    loading = true;
-                                    _selectedStyle = index;
-                                  });
-                                  Future.delayed(Duration(milliseconds: 5)).then((value) =>
-                                    applyStyle(index).then((value) =>
-                                      setState(() {
-                                        loading = false;
-                                      })));
-                                }else{
-                                  setState(() {
-                                    loading = true;
-                                    _selectedStyle = -1;
-                                  });
-                                  pick_image().then((styleImg) {
-                                    if(styleImg != null){
-                                      return applyStyle(index, style : styleImg).then((value) =>
-                                        setState(() {
-                                          loading = false;
-                                        }));
-                                   }
-                                  });
-                                }
-                              }
-                            },
+                            onTap: () => onTapFilter(index),
                             child: index < nb_style ? Image.asset("assets/styles/style${index}.jpg", fit: BoxFit.contain,) : Icon(Icons.image),
 
                           ),
@@ -134,22 +116,6 @@ class _EditionPageState extends State<EditionPage> {
         ],
       ),
     );
-  }
-
-  Future<Uint8List> pick_image() async {
-    ImagePicker _picker  = ImagePicker();
-    if (await Permission.storage.request().isGranted) {
-      PickedFile image;
-      print("trying to get image");
-      _picker.getImage(source: ImageSource.gallery).then((image) async {
-        if(image != null){
-          String path = image.path;
-          return model.loadStyleImage(path);
-        }else{
-          return null;
-        }
-      });
-    }
   }
 }
 
