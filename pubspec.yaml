@@ -67,6 +67,7 @@ flutter:
     - assets/magenta_arbitrary-image-stylization-v1-256_int8_transfer_1.tflite
     - assets/styles/
     - assets/transparent.png
+    - assets/Watermark.png
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/assets-and-images/#resolution-aware.

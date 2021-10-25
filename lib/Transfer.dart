@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:flutter/services.dart';
 import 'package:image/image.dart' as img;
 import 'package:tflite_flutter_helper/tflite_flutter_helper.dart';
+import 'dart:math';
 
 ///this is the class which aplly the style transpher in your picture
 ///Pre-process the inputs
@@ -140,7 +141,7 @@ class Transfer {
       ]
     ];
 
-    double ratio = sliderValue.roundToDouble() / 100.0;
+    double ratio = 1;//sliderValue.roundToDouble() / 100.0;
     for (int i = 0; i < 100; i++) {
       blendedStyleBottleneck[0][0][0][i] = this.styleBottleneck[0][0][0][i] * ratio + (1 - ratio) * this.styleOriginBottleneck[0][0][0][i];
     }
@@ -166,10 +167,29 @@ class Transfer {
     var outputImage = _convertArrayToImage(outputImageData, MODEL_TRANSFER_IMAGE_SIZE);
     var rotateOutputImage = img.copyRotate(outputImage, 90);
     var flipOutputImage = img.flipHorizontal(rotateOutputImage);
-    var resultImage = img.copyResize(flipOutputImage, width: originImage.width, height: originImage.height);
+    var resultImage = flipOutputImage;//img.copyResize(flipOutputImage, width: originImage.width, height: originImage.height);
+    //resultImage = this.saltPeperFilter(resultImage, originImage, sliderValue);
     var result = img.encodeJpg(resultImage);
 
     return result as Uint8List;
+  }
+
+  img.Image saltPeperFilter(img.Image source, img.Image reference, int pourcent){
+    int width = reference.width;
+    int height = reference.height;
+    var rng = new Random();
+    int SaltPourcentage = 100 - pourcent;
+    for (var x = 0; x < width; x++) {
+      for (var y = 0; y < height; y++) {
+        if (rng.nextInt(100) < SaltPourcentage){
+          int color = reference.getPixel(x, y);
+          source.setPixel(x, y, color);
+        } 
+      }
+    }
+    return source;
+
+
   }
 
   img.Image _convertArrayToImage(List<List<List<List<double>>>> imageArray, int inputSize) {

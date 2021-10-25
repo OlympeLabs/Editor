@@ -18,6 +18,7 @@ class _SelectionImagePageState extends State<SelectionImagePage> {
   FutureOr<List<AssetPathEntity>> albums;
   int selectedAlbumIndex = 0;
   Uint8List selectedPictureData;
+  Widget selectedPicturePreview;
 
   final double appBarSize = 50.0;
 
@@ -45,7 +46,8 @@ class _SelectionImagePageState extends State<SelectionImagePage> {
     });
   }
 
-  Future<void> onSelectPhoto(AssetEntity selectedAsset) async {
+  Future<void> onSelectPhoto(AssetEntity selectedAsset, Widget previewImage) async {
+    selectedPicturePreview = previewImage;
     await selectedAsset.originBytes.then((Uint8List image) {
       selectedPictureData = image;
       //return Navigator.push(context, MaterialPageRoute(builder: (context) => EditionPage(image)));
@@ -92,7 +94,7 @@ class _SelectionImagePageState extends State<SelectionImagePage> {
                   child: IconButton(
                     splashRadius: 35,
                     icon:  Icon(Icons.mode_edit),
-                    onPressed: () => {this.selectedPictureData != null ? Navigator.push(context, MaterialPageRoute(builder: (context) => StyleTransferPage(this.selectedPictureData))) : print("select an Image")}),
+                    onPressed: () => {this.selectedPictureData != null ? Navigator.push(context, MaterialPageRoute(builder: (context) => StyleTransferPage(this.selectedPictureData, this.selectedPicturePreview))) : print("select an Image")}),
                 ),
               ],
             ),

@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 import 'package:Editeur/GalleryParts/gallerySelector.dart';
+import 'package:Editeur/UI/savingPage.dart';
 import 'package:Editeur/transfer.dart';
 import 'package:Editeur/usefullWidget/previewImage.dart';
 import 'package:flutter/material.dart';
@@ -8,7 +9,8 @@ import 'package:image/image.dart' as img;
 
 class StyleTransferPage extends StatefulWidget {
   final Uint8List imgBytes;
-  StyleTransferPage(this.imgBytes);
+  final Widget previewImage;
+  StyleTransferPage(this.imgBytes, this.previewImage);
 
   @override
   _StyleTransferPageState createState() => _StyleTransferPageState();
@@ -21,7 +23,6 @@ class _StyleTransferPageState extends State<StyleTransferPage> {
   Uint8List _computedImage;
   Uint8List _preview;
   Uint8List _thumbnail;
-  Uint8List _thumbnailFilter;
   int _selectedStyle = -1;
   Transfer model = Transfer();
   bool loading = true;
@@ -47,9 +48,8 @@ class _StyleTransferPageState extends State<StyleTransferPage> {
     _selectedStyle = -1;
     this.loadStyles();
     model.loadModel().then((value) => model.loadOriginImage(widget.imgBytes));
-    _preview = ComputeThumbnails(widget.imgBytes);
+    _preview = widget.imgBytes;//ComputeThumbnails(widget.imgBytes);
     _thumbnail = _preview;
-    _thumbnailFilter = ComputeThumbnails(widget.imgBytes, maxWidth: 200);
 
     loading = false;
   }
@@ -311,19 +311,7 @@ class _StyleTransferPageState extends State<StyleTransferPage> {
         actions: [
           IconButton(
             onPressed: _computedImage != null
-                ? () async {
-                    savedImage = await PhotoManager.editor.saveImage(_computedImage);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text("The image is saved to ${savedImage.relativePath} ", style: TextStyle(color: Theme.of(context).colorScheme.onSurface),),
-                          ],
-                        ),
-                        backgroundColor: Theme.of(context).colorScheme.surface,
-                      ));
-                  }
+                ? ()=>Navigator.push(context, MaterialPageRoute(builder: (context) => SavingPage(_computedImage)))
                 : null,
             icon: Icon(Icons.save),
           )
@@ -331,7 +319,6 @@ class _StyleTransferPageState extends State<StyleTransferPage> {
         backgroundColor: Colors.transparent,
       ),
       body: Column(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
           //container of the imagePreview
           Expanded(
@@ -416,10 +403,7 @@ class _StyleTransferPageState extends State<StyleTransferPage> {
                             child: InkWell(
                                 onTap: () => onTapFilter(index - 1),
                                 child: index == 0
-                                    ? Image.memory(
-                                        _thumbnailFilter,
-                                        fit: BoxFit.cover,
-                                      )
+                                    ? widget.previewImage
                                     : index == nbStyle + 1
                                         ? Icon(
                                             Icons.image,

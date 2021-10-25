@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
 import 'styleTranferPage.dart';
 import 'selectionImagePage.dart';
 
@@ -11,30 +10,9 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-
-  final ImagePicker _picker = ImagePicker();
-
   @override
   void initState() {
     super.initState();
-  }
-  
-  
-
-
-  Future<void> pickImage() async {
-    //if (await Permission.storage.request().isGranted) {
-      print("trying to get image");
-      _picker.pickImage(source: ImageSource.gallery).then((image) async {
-        if(image != null){
-          return image.readAsBytes().then((value) => Navigator.push(context, MaterialPageRoute(builder: (context)=> StyleTransferPage(value))));
-        }else{
-          print("error image is null");
-        }
-      });
-    /* }else{
-      print("permission not granted");
-    } */
   }
 
   @override

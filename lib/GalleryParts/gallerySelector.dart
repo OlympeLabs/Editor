@@ -217,7 +217,7 @@ class _AlbumViewerState extends State<AlbumViewer> {
       });
     }
 
-    widget.onSelect(asset);
+    widget.onSelect(asset, _selectedMedia);
     //widget.onSelect(_mediaList[index])
   }
 
