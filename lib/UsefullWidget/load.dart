@@ -13,9 +13,15 @@ class Loading extends StatelessWidget {
       child: Center(
           child: Padding(
         padding: const EdgeInsets.all(8.0),
-        child: Text(
-          "Loading",
-          style: TextStyle(fontSize: 30),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          children: [
+            Text(
+              "Loading",
+              style: TextStyle(fontSize: 30),
+            ),
+            CircularProgressIndicator()
+          ],
         ),
       )),
       decoration: BoxDecoration(borderRadius: BorderRadius.all(Radius.circular(10)), color: Theme.of(context).colorScheme.surface)

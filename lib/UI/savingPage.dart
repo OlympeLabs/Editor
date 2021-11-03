@@ -1,31 +1,19 @@
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:photo_manager/photo_manager.dart';
+import 'package:share_plus/share_plus.dart';
 
 
 class SavingPage extends StatelessWidget {
   final Uint8List imageToSave;
-  const SavingPage(this.imageToSave, {Key key}) : super(key: key);
+  SavingPage(this.imageToSave, {Key key}) : super(key: key);
+  AssetEntity savedImageAsset = null;
 
-  void save(context) async {
-    AssetEntity savedImage = await PhotoManager.editor.saveImage(this.imageToSave);
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(
-            "The image is saved to ${savedImage.relativePath} ",
-            style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
-          ),
-        ],
-      ),
-      backgroundColor: Theme.of(context).colorScheme.surface,
-    ));
-  }
 
-  void share(){
-
+  Future<AssetEntity> savedImage() async {
+    return await PhotoManager.editor.saveImage(this.imageToSave);
   }
 
   @override
@@ -52,7 +40,22 @@ class SavingPage extends StatelessWidget {
               crossAxisAlignment : CrossAxisAlignment.center,
               children: [
                 InkWell(
-                  onTap: (){ this.save(context);},
+                  onTap: () async { 
+                    if (savedImageAsset == null)
+                      savedImageAsset = await this.savedImage();
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                      content: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            "The image is saved to ${savedImageAsset.relativePath} ",
+                            style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
+                          ),
+                        ],
+                      ),
+                      backgroundColor: Theme.of(context).colorScheme.surface,
+                    ));
+                  },
                   child: Wrap(
                     crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
@@ -65,8 +68,12 @@ class SavingPage extends StatelessWidget {
                   ),
                 ),
                 InkWell(
-                  onTap: () {
-                    this.share();
+                  onTap: () async {
+                    if (savedImage == null)
+                      savedImageAsset = await this.savedImage();
+                    File imageFile = await savedImageAsset.loadFile();
+                    String path = "${imageFile.path}";
+                    await Share.shareFiles([path], text: "Regarde cette photo que j'ai retouché grace a l'application ${"L'edition"}");
                   },
                   child: Wrap(
                     crossAxisAlignment: WrapCrossAlignment.center,

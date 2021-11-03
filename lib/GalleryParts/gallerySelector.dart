@@ -135,7 +135,6 @@ class _AlbumViewerState extends State<AlbumViewer> {
           newMedia.removeWhere((element) => element.type == AssetType.video);
           media.addAll(newMedia);
         }
-        print("media : ${media.length}");
 
         List<Widget> temp = [];
         int indexStart = _mediaList.length;
@@ -189,7 +188,6 @@ class _AlbumViewerState extends State<AlbumViewer> {
   void onSelect(int index, AssetEntity asset) {
     if (index != selectedIndex) {
       setState(() {
-        print(index);
         selectedIndex = index;
         _selectedMedia = Container(
             height: 300,

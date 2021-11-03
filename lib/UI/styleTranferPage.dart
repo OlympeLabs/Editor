@@ -1,8 +1,10 @@
 import 'dart:typed_data';
 import 'package:Editeur/GalleryParts/gallerySelector.dart';
 import 'package:Editeur/UI/savingPage.dart';
+import 'package:Editeur/imageUtilities.dart';
 import 'package:Editeur/transfer.dart';
 import 'package:Editeur/usefullWidget/previewImage.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:photo_manager/photo_manager.dart';
 import 'package:image/image.dart' as img;
@@ -21,6 +23,7 @@ class _StyleTransferPageState extends State<StyleTransferPage> {
   final sliderHeight = 40.0;
   final _appbarSize = 80.0;
   Uint8List _computedImage;
+  Uint8List _computedImageScaled;
   Uint8List _preview;
   Uint8List _thumbnail;
   int _selectedStyle = -1;
@@ -42,16 +45,39 @@ class _StyleTransferPageState extends State<StyleTransferPage> {
 
   AssetEntity savedImage;
 
+  Widget scale = Icon(Icons.zoom_out_map);
+
   @override
   void initState() {
     super.initState();
     _selectedStyle = -1;
     this.loadStyles();
-    model.loadModel().then((value) => model.loadOriginImage(widget.imgBytes));
+    this.loadModel();
     _preview = widget.imgBytes;//ComputeThumbnails(widget.imgBytes);
     _thumbnail = _preview;
 
     loading = false;
+  }
+  Future<void> loadModel() async {
+    await model.loadModel();
+    await model.loadOriginImageAsync(widget.imgBytes);
+  }
+  Future<void> onScaleUp() async {
+    if(_computedImage != null){
+      await compute(noiseUpScaling,{"original":widget.imgBytes, "computed": _computedImage,"ratio": [this.sliderValue] }).then((List<int> img)=>{
+        setState((){
+          _computedImageScaled = img as Uint8List;
+          _preview = ComputeThumbnails(img as Uint8List);
+          scale = Icon(Icons.zoom_out_map);
+        })
+      });
+    }
+
+  }
+  void onSave(context) {
+    if (_computedImage != null)
+      Navigator.push(context, MaterialPageRoute(builder: (context) => SavingPage( _computedImage)));
+
   }
 
   Uint8List ComputeThumbnails(Uint8List imgBytes, {int maxWidth = 1080}) {
@@ -138,14 +164,14 @@ class _StyleTransferPageState extends State<StyleTransferPage> {
   Future<Uint8List> applyStyle(int index) async {
     if (index != -1) {
       await model.loadStyleImage("assets/styles/style$index.jpg");
-      return model.transfer(sliderValue);
+      return await model.transferAsync();
     }
     return null;
   }
 
   Future<Uint8List> applyMultyStyle(List<Uint8List> assets) async {
     await model.loadStyleImages(assets);
-    return model.transfer(sliderValue);
+    return await model.transferAsync();
   }
 
   void onReapplyfilter() async {
@@ -243,12 +269,12 @@ class _StyleTransferPageState extends State<StyleTransferPage> {
           });
         }).then((value) async {
       if (this.selectedAssets.length > 0 && willApply && !refresh) {
-        await Future.wait(this.selectedAssets.map((asset) => asset.thumbDataWithSize(256, 256)).toList()).then((List<Uint8List> assets) {
+        await Future.wait(this.selectedAssets.map((asset) => asset.thumbDataWithSize(256, 256)).toList()).then((List<Uint8List> assets) async {
           setState(() {
             loading = true;
             _selectedStyle = nbStyle;
           });
-          Future.delayed(Duration(milliseconds: 500)).then((value) => applyMultyStyle(assets).then((value) => setState(() {
+          await Future.delayed(Duration(milliseconds: 500)).then((value) => applyMultyStyle(assets).then((value) => setState(() {
                 loading = false;
                 _computedImage = value;
                 _computedSliderValue = this.sliderValue;
@@ -256,6 +282,7 @@ class _StyleTransferPageState extends State<StyleTransferPage> {
                 this.selectedAssets = [];
                 willApply = false;
               })));
+          onScaleUp();
         });
       } else {
         this.selectedAssets = [];
@@ -290,12 +317,13 @@ class _StyleTransferPageState extends State<StyleTransferPage> {
           loading = true;
           _selectedStyle = index;
         });
-        Future.delayed(Duration(milliseconds: 10)).then((value) => applyStyle(index).then((value) => setState(() {
+        await Future.delayed(Duration(milliseconds: 10)).then((value) => applyStyle(index).then((value) => setState(() {
               loading = false;
               _computedSliderValue = this.sliderValue;
               _computedImage = value;
               _preview = ComputeThumbnails(value);
             })));
+        onScaleUp();
       }
     }
   }
@@ -310,10 +338,12 @@ class _StyleTransferPageState extends State<StyleTransferPage> {
         ),
         actions: [
           IconButton(
-            onPressed: _computedImage != null
-                ? ()=>Navigator.push(context, MaterialPageRoute(builder: (context) => SavingPage(_computedImage)))
-                : null,
+            onPressed: () => onSave(context),
             icon: Icon(Icons.save),
+          ),
+          InkWell(
+            onTap: ()async => onScaleUp(),
+            child: Center(child: scale),
           )
         ],
         backgroundColor: Colors.transparent,
@@ -374,7 +404,7 @@ class _StyleTransferPageState extends State<StyleTransferPage> {
                 Padding(
                   padding: const EdgeInsets.all(3.0),
                   child: IconButton(
-                      onPressed: () => onReapplyfilter(),
+                      onPressed: () => onScaleUp(),
                       icon: Icon(
                         sliderValue == _computedSliderValue ?  Icons.photo_filter_outlined : Icons.photo_filter,
                       )),
@@ -424,5 +454,3 @@ class _StyleTransferPageState extends State<StyleTransferPage> {
     );
   }
 }
-
-

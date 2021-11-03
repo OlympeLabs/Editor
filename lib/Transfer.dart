@@ -1,9 +1,9 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:tflite_flutter/tflite_flutter.dart';
 import 'dart:typed_data';
 import 'package:flutter/services.dart';
 import 'package:image/image.dart' as img;
-import 'package:tflite_flutter_helper/tflite_flutter_helper.dart';
 import 'dart:math';
 
 ///this is the class which aplly the style transpher in your picture
@@ -23,8 +23,6 @@ class Transfer {
 
   Interpreter interpreterStyle;
   Interpreter interpreterTransform;
-  ImageProcessor imageStyleProcessor;
-  ImageProcessor imageTransferProcessor;
 
 //style part
   String styleLoaded = "";
@@ -35,15 +33,13 @@ class Transfer {
 //image part
   img.Image originImage;
   List<List<List<List<double>>>> styleOriginBottleneck;
-  Uint8List modelTransferInput;
+  List<int> modelTransferInput;
   bool originImageLoaded = false;
 
   Future<void> loadModel() async {
     try {
-      interpreterStyle = await Interpreter.fromAsset(_styleModelFile);
-      interpreterTransform = await Interpreter.fromAsset(_transformModelFile);
-      imageStyleProcessor = ImageProcessorBuilder().add(ResizeOp(MODEL_STYLE_IMAGE_SIZE, MODEL_STYLE_IMAGE_SIZE, ResizeMethod.NEAREST_NEIGHBOUR)).add(CastOp(TfLiteType.float32)).build();
-      imageTransferProcessor = ImageProcessorBuilder().add(ResizeOp(MODEL_TRANSFER_IMAGE_SIZE, MODEL_TRANSFER_IMAGE_SIZE, ResizeMethod.NEAREST_NEIGHBOUR)).add(CastOp(TfLiteType.float32)).build();
+      interpreterStyle = await Interpreter.fromAsset(_styleModelFile, options: InterpreterOptions()..threads = 4);
+      interpreterTransform = await Interpreter.fromAsset(_transformModelFile, options: InterpreterOptions()..threads = 4);
     } catch (e) {
       print("error at load :\n$e");
     }
@@ -63,12 +59,12 @@ class Transfer {
   }
 
   void loadStyleImages(List<Uint8List> multistyles) {
-    List<List<List<List<double>>>> multiStyleBottleneck= [
+    List<List<List<List<double>>>> multiStyleBottleneck = [
       [
         [List.generate(100, (index) => 0.0)]
       ]
     ];
-    for (int i = 0 ; i < multistyles.length; i ++){
+    for (int i = 0; i < multistyles.length; i++) {
       this.styleData = multistyles[i];
       loadStyleImageData();
       for (int i = 0; i < 100; i++) {
@@ -78,7 +74,6 @@ class Transfer {
     for (int i = 0; i < 100; i++) {
       this.styleBottleneck[0][0][0][i] = multiStyleBottleneck[0][0][0][i] / multistyles.length;
     }
-
   }
 
   void loadStyleImageData() {
@@ -130,6 +125,37 @@ class Transfer {
     this.originImageLoaded = true;
   }
 
+  Future<void> loadOriginImageAsync(Uint8List originData) async {
+    Map<String, dynamic> map = await compute(preprocessImageSource, originData);
+
+    this.originImage = map["originImage"] as img.Image;
+    this.modelTransferInput = map["modelTransferInput"];
+    this.originImageLoaded = true;
+  }
+
+  Future<Uint8List> transferAsync() async {
+    if (!isStyleLoaded) {
+      this.loadStyleImageData();
+    }
+    Map<String, dynamic> inputMap = {};
+    inputMap["modelTransferInput"] = this.modelTransferInput;
+    inputMap["styleBottleneck"] = this.styleBottleneck;
+    inputMap["styleOriginBottleneck"] = this.styleOriginBottleneck;
+    Map<String, dynamic> outputMap = await compute(preprocessTransferIsolated, inputMap);
+
+    List<Object> inputsForStyleTransfer = outputMap["inputsForStyleTransfer"];
+    Map<int, Object> outputsForStyleTransfer = outputMap["outputsForStyleTransfer"];
+    List<List<List<List<double>>>> outputImageData = outputMap["outputImageData"];
+    interpreterTransform.runForMultipleInputs(inputsForStyleTransfer, outputsForStyleTransfer);
+
+    var outputImage = _convertArrayToImage(outputImageData, MODEL_TRANSFER_IMAGE_SIZE); 
+    var rotateOutputImage = img.copyRotate(outputImage, 90);
+    var flipOutputImage = img.flipHorizontal(rotateOutputImage);
+    var resultImage = img.copyResize(flipOutputImage, width: originImage.width, height: originImage.height);
+    var result = img.encodeJpg(resultImage);
+    return result;
+  }
+
   Uint8List transfer(int sliderValue) {
     if (!isStyleLoaded) {
       this.loadStyleImageData();
@@ -141,7 +167,7 @@ class Transfer {
       ]
     ];
 
-    double ratio = 1;//sliderValue.roundToDouble() / 100.0;
+    double ratio = 1; //sliderValue.roundToDouble() / 100.0;
     for (int i = 0; i < 100; i++) {
       blendedStyleBottleneck[0][0][0][i] = this.styleBottleneck[0][0][0][i] * ratio + (1 - ratio) * this.styleOriginBottleneck[0][0][0][i];
     }
@@ -167,62 +193,109 @@ class Transfer {
     var outputImage = _convertArrayToImage(outputImageData, MODEL_TRANSFER_IMAGE_SIZE);
     var rotateOutputImage = img.copyRotate(outputImage, 90);
     var flipOutputImage = img.flipHorizontal(rotateOutputImage);
-    var resultImage = flipOutputImage;//img.copyResize(flipOutputImage, width: originImage.width, height: originImage.height);
+    var resultImage = img.copyResize(flipOutputImage, width: originImage.width, height: originImage.height);
     //resultImage = this.saltPeperFilter(resultImage, originImage, sliderValue);
     var result = img.encodeJpg(resultImage);
 
     return result as Uint8List;
   }
 
-  img.Image saltPeperFilter(img.Image source, img.Image reference, int pourcent){
+  img.Image saltPeperFilter(img.Image source, img.Image reference, int pourcent) {
     int width = reference.width;
     int height = reference.height;
     var rng = new Random();
     int SaltPourcentage = 100 - pourcent;
     for (var x = 0; x < width; x++) {
       for (var y = 0; y < height; y++) {
-        if (rng.nextInt(100) < SaltPourcentage){
+        if (rng.nextInt(100) < SaltPourcentage) {
           int color = reference.getPixel(x, y);
           source.setPixel(x, y, color);
-        } 
+        }
       }
     }
     return source;
-
-
-  }
-
-  img.Image _convertArrayToImage(List<List<List<List<double>>>> imageArray, int inputSize) {
-    img.Image image = img.Image.rgb(inputSize, inputSize);
-    for (var x = 0; x < imageArray[0].length; x++) {
-      for (var y = 0; y < imageArray[0][0].length; y++) {
-        var r = (imageArray[0][x][y][0] * 255).toInt();
-        var g = (imageArray[0][x][y][1] * 255).toInt();
-        var b = (imageArray[0][x][y][2] * 255).toInt();
-        image.setPixelRgba(x, y, r, g, b);
-      }
-    }
-    return image;
-  }
-
-  Uint8List _imageToByteListUInt8(
-    img.Image image,
-    int inputSize,
-    double mean,
-    double std,
-  ) {
-    var convertedBytes = Float32List(1 * inputSize * inputSize * 3);
-    var buffer = Float32List.view(convertedBytes.buffer);
-    int pixelIndex = 0;
-
-    for (var i = 0; i < inputSize; i++) {
-      for (var j = 0; j < inputSize; j++) {
-        var pixel = image.getPixel(j, i);
-        buffer[pixelIndex++] = (img.getRed(pixel) - mean) / std;
-        buffer[pixelIndex++] = (img.getGreen(pixel) - mean) / std;
-        buffer[pixelIndex++] = (img.getBlue(pixel) - mean) / std;
-      }
-    }
-    return convertedBytes.buffer.asUint8List();
   }
 }
+
+Map<String, dynamic> preprocessImageSource(List<int> imageByte) {
+  const int MODEL_TRANSFER_IMAGE_SIZE = 384;
+  const int MODEL_STYLE_IMAGE_SIZE = 256;
+
+  img.Image originImage;
+  Uint8List modelTransferInput;
+  List<List<List<List<double>>>> styleOriginBottleneck;
+
+  originImage = img.decodeImage(imageByte);
+  var modelTransferImage = img.copyResize(originImage, width: MODEL_TRANSFER_IMAGE_SIZE, height: MODEL_TRANSFER_IMAGE_SIZE, interpolation: img.Interpolation.nearest);
+  modelTransferInput = _imageToByteListUInt8(modelTransferImage, MODEL_TRANSFER_IMAGE_SIZE, 0, 255);
+
+  Map<String, dynamic> map = {};
+  map["originImage"] = originImage;
+  map["modelTransferInput"] = modelTransferInput;
+  return map;
+  // style predict model
+}
+
+img.Image _convertArrayToImage(List<List<List<List<double>>>> imageArray, int inputSize) {
+  img.Image image = img.Image.rgb(inputSize, inputSize);
+  for (var x = 0; x < imageArray[0].length; x++) {
+    for (var y = 0; y < imageArray[0][0].length; y++) {
+      var r = (imageArray[0][x][y][0] * 255).toInt();
+      var g = (imageArray[0][x][y][1] * 255).toInt();
+      var b = (imageArray[0][x][y][2] * 255).toInt();
+      image.setPixelRgba(x, y, r, g, b);
+    }
+  }
+  return image;
+}
+
+Uint8List _imageToByteListUInt8(
+  img.Image image,
+  int inputSize,
+  double mean,
+  double std,
+) {
+  var convertedBytes = Float32List(1 * inputSize * inputSize * 3);
+  var buffer = Float32List.view(convertedBytes.buffer);
+  int pixelIndex = 0;
+
+  for (var i = 0; i < inputSize; i++) {
+    for (var j = 0; j < inputSize; j++) {
+      var pixel = image.getPixel(j, i);
+      buffer[pixelIndex++] = (img.getRed(pixel) - mean) / std;
+      buffer[pixelIndex++] = (img.getGreen(pixel) - mean) / std;
+      buffer[pixelIndex++] = (img.getBlue(pixel) - mean) / std;
+    }
+  }
+  return convertedBytes.buffer.asUint8List();
+}
+
+Map<String, dynamic> preprocessTransferIsolated(Map<String, dynamic> input) {
+  const int MODEL_TRANSFER_IMAGE_SIZE = 384;
+
+  Uint8List modelTransferInput = input["modelTransferInput"] as Uint8List;
+  List<List<List<List<double>>>> styleBottleneck = input["styleBottleneck"];
+
+  List<Object> inputsForStyleTransfer = [modelTransferInput, styleBottleneck];
+  var outputsForStyleTransfer = Map<int, Object>();
+
+  // stylized_image 1 384 384 3
+  List<List<List<List<double>>>> outputImageData = [
+    List.generate(
+      MODEL_TRANSFER_IMAGE_SIZE,
+      (index) => List.generate(
+        MODEL_TRANSFER_IMAGE_SIZE,
+        (index) => List.generate(3, (index) => 0.0),
+      ),
+    )
+  ];
+  outputsForStyleTransfer[0] = outputImageData;
+
+  Map<String, dynamic> output = {};
+  output["inputsForStyleTransfer"] = inputsForStyleTransfer;
+  output["outputsForStyleTransfer"] = outputsForStyleTransfer;
+  output["outputImageData"] = outputImageData;
+  return output;
+}
+
+ 
