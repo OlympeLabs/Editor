@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'styleTranferPage.dart';
+import 'package:photo_manager/photo_manager.dart';
 import 'selectionImagePage.dart';
 
 class MyHomePage extends StatefulWidget {
@@ -27,7 +27,16 @@ class _MyHomePageState extends State<MyHomePage> {
               height:  200,
               width:  200,
               child: FloatingActionButton(
-                onPressed: ()=>Navigator.push(context, MaterialPageRoute(builder: (context)=> SelectionImagePage())),
+                onPressed: ()async{
+                  var result = await PhotoManager.requestPermissionExtend();
+                  if (result.isAuth) {
+                    return Navigator.push(context, MaterialPageRoute(builder: (context)=> SelectionImagePage()));
+                  } else {
+                    // fail
+                    /// if result is fail, you can call `PhotoManager.openSetting();`  to open android/ios applicaton's setting to get permission
+                    return PhotoManager.openSetting();
+                  }
+                },
                 tooltip: 'Select a picture',
                 child: Icon(Icons.image , color: Theme.of(context).cardColor , size: 100),
               ),

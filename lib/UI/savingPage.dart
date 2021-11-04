@@ -69,11 +69,10 @@ class SavingPage extends StatelessWidget {
                 ),
                 InkWell(
                   onTap: () async {
-                    if (savedImage == null)
-                      savedImageAsset = await this.savedImage();
+                    savedImageAsset = await this.savedImage();
                     File imageFile = await savedImageAsset.loadFile();
                     String path = "${imageFile.path}";
-                    await Share.shareFiles([path], text: "Regarde cette photo que j'ai retouché grace a l'application ${"L'edition"}");
+                    await Share.shareFiles([path], text: "Regarde cette photo que j'ai retouché grace a l'application ${"L'Editeur"} #EditeurApp");
                   },
                   child: Wrap(
                     crossAxisAlignment: WrapCrossAlignment.center,

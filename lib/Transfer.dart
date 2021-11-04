@@ -219,11 +219,9 @@ class Transfer {
 
 Map<String, dynamic> preprocessImageSource(List<int> imageByte) {
   const int MODEL_TRANSFER_IMAGE_SIZE = 384;
-  const int MODEL_STYLE_IMAGE_SIZE = 256;
 
   img.Image originImage;
   Uint8List modelTransferInput;
-  List<List<List<List<double>>>> styleOriginBottleneck;
 
   originImage = img.decodeImage(imageByte);
   var modelTransferImage = img.copyResize(originImage, width: MODEL_TRANSFER_IMAGE_SIZE, height: MODEL_TRANSFER_IMAGE_SIZE, interpolation: img.Interpolation.nearest);

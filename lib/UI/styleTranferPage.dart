@@ -30,9 +30,11 @@ class _StyleTransferPageState extends State<StyleTransferPage> {
   Transfer model = Transfer();
   bool loading = true;
   bool isPressed = false;
-  final nbStyle = 6;
+  final nbMaxOfStyle = 6;
   List<String> stylePaths = [];
   int _computedSliderValue;
+
+  bool showSlider = false;
   int sliderValue = 80;
 
   //PictureSelection
@@ -42,10 +44,7 @@ class _StyleTransferPageState extends State<StyleTransferPage> {
   List<AssetEntity> selectedAssets = [];
   AssetPathEntity selectedAlbum;
 
-
   AssetEntity savedImage;
-
-  Widget scale = Icon(Icons.zoom_out_map);
 
   @override
   void initState() {
@@ -53,34 +52,44 @@ class _StyleTransferPageState extends State<StyleTransferPage> {
     _selectedStyle = -1;
     this.loadStyles();
     this.loadModel();
-    _preview = widget.imgBytes;//ComputeThumbnails(widget.imgBytes);
+    _preview = widget.imgBytes;
     _thumbnail = _preview;
 
     loading = false;
   }
+
   Future<void> loadModel() async {
     await model.loadModel();
     await model.loadOriginImageAsync(widget.imgBytes);
   }
+
   Future<void> onScaleUp() async {
-    if(_computedImage != null){
-      await compute(noiseUpScaling,{"original":widget.imgBytes, "computed": _computedImage,"ratio": [this.sliderValue] }).then((List<int> img)=>{
-        setState((){
-          _computedImageScaled = img as Uint8List;
-          _preview = ComputeThumbnails(img as Uint8List);
-          scale = Icon(Icons.zoom_out_map);
-        })
+    if (_computedImage != null) {
+      await compute(noiseUpScaling, {
+        "original": widget.imgBytes,
+        "computed": _computedImage,
+        "ratio": [this.sliderValue]
+      }).then((List<int> img) async {
+        _computedImageScaled = img as Uint8List;
+
+        compute(computeThumbnailsByWidth, {
+          "imgBytes": _computedImageScaled,
+          "maxWidth": [1000]
+        }).then((List<int> thumbnail) {
+          setState(() {
+            _preview = thumbnail as Uint8List;
+            loading = false;
+          });
+        });
       });
     }
-
   }
+
   void onSave(context) {
-    if (_computedImage != null)
-      Navigator.push(context, MaterialPageRoute(builder: (context) => SavingPage( _computedImage)));
-
+    if (_computedImageScaled != null) Navigator.push(context, MaterialPageRoute(builder: (context) => SavingPage(_computedImageScaled)));
   }
 
-  Uint8List ComputeThumbnails(Uint8List imgBytes, {int maxWidth = 1080}) {
+  /*  Uint8List computeThumbnails(Uint8List imgBytes, {int maxWidth = 1080}) {
     img.Image originalImage = img.decodeImage(imgBytes);
     int originalW = originalImage.width;
     int originalH = originalImage.height;
@@ -92,31 +101,7 @@ class _StyleTransferPageState extends State<StyleTransferPage> {
       return img.encodeJpg(img.copyResize(originalImage, width: w, height: h));
     }
     return imgBytes;
-  }
-  /*
-  Uint8List computeThumbnail(double width, double height) {
-    img.Image thumb = img.decodeImage(_preview);
-    double ratioImg = thumb.width.roundToDouble() / thumb.height.roundToDouble();
-    double ratioScreen = width.roundToDouble() / height.roundToDouble();
-    int compW = thumb.width;
-    int compH = thumb.height;
-    if (ratioScreen < ratioImg) {
-      //width too long
-      compW = width.round();
-      compH = (compW / thumb.width * compH).round();
-    } else {
-      //height too long
-      compH = height.round();
-      compW = (ratioImg * height).round();
-    }
-
-    var resultImage = img.copyResize(thumb, width: compW, height: compH, interpolation: img.Interpolation.cubic);
-    var result = img.encodeJpg(resultImage);
-    setState(() {
-      _thumbnail = result;
-    });
-    return result;
-  }*/
+  } */
 
   IconData getIconFilter(int nbImage) {
     switch (nbImage) {
@@ -156,22 +141,24 @@ class _StyleTransferPageState extends State<StyleTransferPage> {
   }
 
   void loadStyles() {
-    for (int i = 0; i < nbStyle; i++) {
+    for (int i = 0; i < nbMaxOfStyle; i++) {
       stylePaths.add("assets/styles/style$i.jpg");
     }
   }
 
-  Future<Uint8List> applyStyle(int index) async {
+  Future<void> applyStyle(int index) async {
     if (index != -1) {
       await model.loadStyleImage("assets/styles/style$index.jpg");
-      return await model.transferAsync();
+      Uint8List ImageFiltered = await model.transferAsync();
+      await onfilterApplied(ImageFiltered);
     }
     return null;
   }
 
-  Future<Uint8List> applyMultyStyle(List<Uint8List> assets) async {
+  Future<void> applyMultyStyle(List<Uint8List> assets) async {
     await model.loadStyleImages(assets);
-    return await model.transferAsync();
+    Uint8List ImageFiltered = await model.transferAsync();
+    await onfilterApplied(ImageFiltered);
   }
 
   void onReapplyfilter() async {
@@ -180,109 +167,91 @@ class _StyleTransferPageState extends State<StyleTransferPage> {
     }
   }
 
+  Future<void> onfilterApplied(Uint8List ImageFiltered) async {
+    this._computedImage = ImageFiltered;
+    this._computedSliderValue = this.sliderValue;
+    this.selectedAssets = [];
+    this.willApply = false;
+    return await onScaleUp();
+  }
+
+  Widget modalBuild(BuildContext context, List<AssetPathEntity> albums) {
+    return StatefulBuilder(builder: (BuildContext context, StateSetter setmodalState) {
+      return Column(
+        children: <Widget>[
+          Container(
+            color: Theme.of(context).backgroundColor,
+            child: Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  DropDownAlbums(
+                      albums: albums,
+                      selectedAlbumIndex: this.selectedAlbumIndex,
+                      onSelection: (int index) {
+                        setmodalState(() {
+                          this.selectedAssets = [];
+                          this.selectedAlbumIndex = index;
+                          this.selectedAlbum = albums[this.selectedAlbumIndex];
+                          this.refresh = true;
+                        });
+                        willApply = false;
+                        Navigator.pop(context);
+                      }),
+                  ElevatedButton(
+                    onPressed: () {
+                      willApply = true;
+                      Navigator.pop(context);
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.all(8.0),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text("Apply"),
+                          Container(
+                            width: 5,
+                          ),
+                          Icon(getIconFilter(this.selectedAssets.length)),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          Expanded(
+            child: Container(
+              child: AssetSelector(
+                album: selectedAlbum,
+                onUpdateSelection: (List<AssetEntity> selectedAssets) async {
+                  setmodalState(() {
+                    this.selectedAssets = selectedAssets;
+                  });
+                },
+              ),
+            ),
+          ),
+        ],
+      );
+    });
+  }
+
   Future<void> summonModal(List<AssetPathEntity> albums) async {
     await showModalBottomSheet<void>(
         context: context,
         builder: (BuildContext context) {
-          return StatefulBuilder(builder: (BuildContext context, StateSetter setmodalState) {
-            return Column(
-              children: <Widget>[
-                Container(
-                  color: Theme.of(context).backgroundColor,
-                  child: Padding(
-                    padding: const EdgeInsets.all(8.0),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        DropDownAlbums(
-                            albums: albums,
-                            selectedAlbumIndex: this.selectedAlbumIndex,
-                            onSelection: (int index) {
-                              setmodalState(() {
-                                this.selectedAssets = [];
-                                this.selectedAlbumIndex = index;
-                                this.selectedAlbum = albums[this.selectedAlbumIndex];
-                                this.refresh = true;
-                              });
-                              willApply = false;
-                              Navigator.pop(context);
-                            }),
-                        /* Container(
-                            child: InkWell(
-                              onTap: () {
-                                setmodalState(() {
-                                  multiSelection = !multiSelection;
-                                });
-                              },
-                              child: Padding(
-                                padding: const EdgeInsets.all(8.0),
-                                child: Row(
-                                  children: [
-                                    Text("Multi Selection"),
-                                    Container(
-                                      width: 5,
-                                    ),
-                                    Icon(this.multiSelection ? Icons.one Icons.add_to_photos_outlined)
-                                  ],
-                                ),
-                              ),
-                            ),
-                            decoration: BoxDecoration(borderRadius: BorderRadius.circular(5), color: Theme.of(context).colorScheme.surface),
-                          ), */
-                        ElevatedButton(
-                          onPressed: () {
-                            willApply = true;
-                            Navigator.pop(context);
-                          },
-                          child: Padding(
-                            padding: const EdgeInsets.all(8.0),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text("Apply"),
-                                Container(
-                                  width: 5,
-                                ),
-                                Icon(getIconFilter(this.selectedAssets.length)),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                Expanded(
-                  child: Container(
-                    child: AssetSelector(
-                      album: selectedAlbum,
-                      onUpdateSelection: (List<AssetEntity> selectedAssets) async {
-                        setmodalState(() {
-                          this.selectedAssets = selectedAssets;
-                        });
-                      },
-                    ),
-                  ),
-                ),
-              ],
-            );
-          });
+          return modalBuild(context, albums);
         }).then((value) async {
       if (this.selectedAssets.length > 0 && willApply && !refresh) {
         await Future.wait(this.selectedAssets.map((asset) => asset.thumbDataWithSize(256, 256)).toList()).then((List<Uint8List> assets) async {
           setState(() {
             loading = true;
-            _selectedStyle = nbStyle;
+            _selectedStyle = nbMaxOfStyle;
           });
-          await Future.delayed(Duration(milliseconds: 500)).then((value) => applyMultyStyle(assets).then((value) => setState(() {
-                loading = false;
-                _computedImage = value;
-                _computedSliderValue = this.sliderValue;
-                _preview = ComputeThumbnails(value);
-                this.selectedAssets = [];
-                willApply = false;
-              })));
-          onScaleUp();
+          await applyMultyStyle(assets);
         });
       } else {
         this.selectedAssets = [];
@@ -303,27 +272,33 @@ class _StyleTransferPageState extends State<StyleTransferPage> {
   }
 
   void onTapFilter(index) async {
-    if (index == nbStyle) {
+    if (_selectedStyle == index && index != nbMaxOfStyle && index != -1 ){
+      return setState(() {
+        showSlider = !showSlider;
+      });
+    }
+    if (index == nbMaxOfStyle) {
+      if (_selectedStyle == index){
+        setState(() {
+          showSlider = !showSlider;
+        });
+      }
       await onSelectPicture();
     } else {
       if (loading == false && (_selectedStyle != index || _selectedStyle == index && this.sliderValue != this._computedSliderValue)) {
         if (index == -1) {
           return setState(() {
+            showSlider = false;
             _selectedStyle = index;
             _preview = _thumbnail;
           });
         }
         setState(() {
+          showSlider = false;
           loading = true;
           _selectedStyle = index;
         });
-        await Future.delayed(Duration(milliseconds: 10)).then((value) => applyStyle(index).then((value) => setState(() {
-              loading = false;
-              _computedSliderValue = this.sliderValue;
-              _computedImage = value;
-              _preview = ComputeThumbnails(value);
-            })));
-        onScaleUp();
+        await applyStyle(index);
       }
     }
   }
@@ -340,10 +315,6 @@ class _StyleTransferPageState extends State<StyleTransferPage> {
           IconButton(
             onPressed: () => onSave(context),
             icon: Icon(Icons.save),
-          ),
-          InkWell(
-            onTap: ()async => onScaleUp(),
-            child: Center(child: scale),
           )
         ],
         backgroundColor: Colors.transparent,
@@ -359,15 +330,13 @@ class _StyleTransferPageState extends State<StyleTransferPage> {
               focusColor: Colors.transparent,
               hoverColor: Colors.transparent,
               splashColor: Colors.transparent,
-              onLongPress: (){
+              onLongPress: () {
                 setState(() {
                   isPressed = true;
-                 });
+                });
               },
               child: Listener(
-                  onPointerDown: (event) => {
-                        
-                      },
+                  onPointerDown: (event) => {},
                   onPointerUp: (event) => {
                         setState(() {
                           isPressed = false;
@@ -376,7 +345,7 @@ class _StyleTransferPageState extends State<StyleTransferPage> {
                   child: PreviewImage(_preview, loading, isPressed, _thumbnail)),
             ),
           ),
-          Container(
+          showSlider ? Container(
             height: sliderHeight, //20
             width: MediaQuery.of(context).size.width, //100%,
             child: Row(
@@ -404,14 +373,19 @@ class _StyleTransferPageState extends State<StyleTransferPage> {
                 Padding(
                   padding: const EdgeInsets.all(3.0),
                   child: IconButton(
-                      onPressed: () => onScaleUp(),
+                      onPressed: () {
+                        setState(() {
+                          loading = true;
+                        });
+                        return onScaleUp();
+                      },
                       icon: Icon(
-                        sliderValue == _computedSliderValue ?  Icons.photo_filter_outlined : Icons.photo_filter,
+                        sliderValue == _computedSliderValue ? Icons.photo_filter_outlined : Icons.photo_filter,
                       )),
                 ),
               ],
             ),
-          ),
+          ) : Container(),
 
           //container of the filters
           Container(
@@ -419,7 +393,7 @@ class _StyleTransferPageState extends State<StyleTransferPage> {
             child: Center(
               child: ListView.separated(
                   scrollDirection: Axis.horizontal,
-                  itemCount: nbStyle + 2,
+                  itemCount: nbMaxOfStyle + 2,
                   separatorBuilder: (context, index) => Container(height: _filterRowHeight, width: 10),
                   itemBuilder: (context, index) => Padding(
                         padding: const EdgeInsets.only(top: 5.0, bottom: 5.0),
@@ -434,7 +408,7 @@ class _StyleTransferPageState extends State<StyleTransferPage> {
                                 onTap: () => onTapFilter(index - 1),
                                 child: index == 0
                                     ? widget.previewImage
-                                    : index == nbStyle + 1
+                                    : index == nbMaxOfStyle + 1
                                         ? Icon(
                                             Icons.image,
                                             size: 80,

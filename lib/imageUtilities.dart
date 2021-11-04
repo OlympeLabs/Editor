@@ -5,7 +5,7 @@ import 'package:image/image.dart' as img;
 List<int> noiseUpScaling(Map<String, List<int>> map) {
   List<int> original = map["original"];
   List<int> computed = map["computed"];
-  double ratio = (map["ratio"][0] / 30);
+  double ratio = (map["ratio"][0] / 30)+1;
 
   img.Image originalImage = img.decodeImage(original);
   img.Image computedImage = img.decodeImage(computed);
@@ -63,4 +63,23 @@ List<int> abgrToRGB(int abgr) {
   int g = (abgr >> 8) & 0xFF;
   int r = abgr & 0xFF;
   return [r, g, b];
+}
+
+
+ List<int> computeThumbnailsByWidth(Map<String, List<int>> map) {
+  List<int> imgBytes = map["imgBytes"];
+  int maxWidth  = map["maxWidth"][0];
+
+  
+  img.Image originalImage = img.decodeImage(imgBytes);
+  int originalW = originalImage.width;
+  int originalH = originalImage.height;
+  double scaleW = originalW / maxWidth;
+
+  if (scaleW > 1) {
+    int w = maxWidth;
+    int h = ((originalH / originalW) * maxWidth).round();
+    return img.encodeJpg(img.copyResize(originalImage, width: w, height: h));
+  }
+  return imgBytes;
 }
