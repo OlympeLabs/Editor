@@ -7,7 +7,6 @@ import 'package:Editeur/usefullWidget/previewImage.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:photo_manager/photo_manager.dart';
-import 'package:image/image.dart' as img;
 
 class StyleTransferPage extends StatefulWidget {
   final Uint8List imgBytes;

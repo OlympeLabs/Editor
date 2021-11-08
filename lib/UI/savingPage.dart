@@ -6,14 +6,19 @@ import 'package:photo_manager/photo_manager.dart';
 import 'package:share_plus/share_plus.dart';
 
 
-class SavingPage extends StatelessWidget {
+class SavingPage extends StatefulWidget {
   final Uint8List imageToSave;
   SavingPage(this.imageToSave, {Key key}) : super(key: key);
+
+  @override
+  State<SavingPage> createState() => _SavingPageState();
+}
+
+class _SavingPageState extends State<SavingPage> {
   AssetEntity savedImageAsset = null;
 
-
   Future<AssetEntity> savedImage() async {
-    return await PhotoManager.editor.saveImage(this.imageToSave);
+    return await PhotoManager.editor.saveImage(this.widget.imageToSave);
   }
 
   @override
@@ -29,7 +34,7 @@ class SavingPage extends StatelessWidget {
           Container(
             height: (MediaQuery.of(context).size.height - 80) *0.9,
             child: Center(
-              child: Image.memory(imageToSave, fit: BoxFit.contain,)
+              child: Image.memory(widget.imageToSave, fit: BoxFit.contain,)
             ),
           ),
           Container(

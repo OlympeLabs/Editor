@@ -15,11 +15,11 @@ class Transfer {
   //final _styleModelFile = 'magenta_arbitrary-image-stylization-v1-256_fp16_prediction_1.tflite';
   //final _transformModelFile = 'magenta_arbitrary-image-stylization-v1-256_fp16_transfer_1.tflite';
 
-  final _styleModelFile = 'magenta_arbitrary-image-stylization-v1-256_int8_prediction_1.tflite';
-  final _transformModelFile = 'magenta_arbitrary-image-stylization-v1-256_int8_transfer_1.tflite';
+  static final _styleModelFile = 'magenta_arbitrary-image-stylization-v1-256_int8_prediction_1.tflite';
+  static final _transformModelFile = 'magenta_arbitrary-image-stylization-v1-256_int8_transfer_1.tflite';
 
-  static const int MODEL_TRANSFER_IMAGE_SIZE = 384;
-  static const int MODEL_STYLE_IMAGE_SIZE = 256;
+  static final int MODEL_TRANSFER_IMAGE_SIZE = 384;
+  static final int MODEL_STYLE_IMAGE_SIZE = 256;
 
   Interpreter interpreterStyle;
   Interpreter interpreterTransform;
@@ -221,7 +221,7 @@ Map<String, dynamic> preprocessImageSource(List<int> imageByte) {
   const int MODEL_TRANSFER_IMAGE_SIZE = 384;
 
   img.Image originImage;
-  Uint8List modelTransferInput;
+  List<int> modelTransferInput;
 
   originImage = img.decodeImage(imageByte);
   var modelTransferImage = img.copyResize(originImage, width: MODEL_TRANSFER_IMAGE_SIZE, height: MODEL_TRANSFER_IMAGE_SIZE, interpolation: img.Interpolation.nearest);
@@ -247,7 +247,7 @@ img.Image _convertArrayToImage(List<List<List<List<double>>>> imageArray, int in
   return image;
 }
 
-Uint8List _imageToByteListUInt8(
+List<int> _imageToByteListUInt8(
   img.Image image,
   int inputSize,
   double mean,
