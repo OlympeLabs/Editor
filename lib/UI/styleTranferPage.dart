@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 import 'package:Editeur/GalleryParts/gallerySelector.dart';
 import 'package:Editeur/UI/savingPage.dart';
+import 'package:Editeur/UsefullWidget/filterIcon.dart';
 import 'package:Editeur/imageUtilities.dart';
 import 'package:Editeur/transfer.dart';
 import 'package:Editeur/usefullWidget/previewImage.dart';
@@ -18,7 +19,7 @@ class StyleTransferPage extends StatefulWidget {
 }
 
 class _StyleTransferPageState extends State<StyleTransferPage> {
-  final _filterRowHeight = 110.0;
+  final _filterRowHeight = 132.0;
   final sliderHeight = 40.0;
   final _appbarSize = 80.0;
   Uint8List _computedImage;
@@ -45,12 +46,14 @@ class _StyleTransferPageState extends State<StyleTransferPage> {
 
   AssetEntity savedImage;
 
+  Future loadingModel;
+
   @override
   void initState() {
     super.initState();
     _selectedStyle = -1;
     this.loadStyles();
-    this.loadModel();
+    loadingModel = this.loadModel();
     _preview = widget.imgBytes;
     _thumbnail = _preview;
 
@@ -148,14 +151,18 @@ class _StyleTransferPageState extends State<StyleTransferPage> {
   Future<void> applyStyle(int index) async {
     if (index != -1) {
       await model.loadStyleImage("assets/styles/style$index.jpg");
-      Uint8List ImageFiltered = await model.transferAsync();
-      await onfilterApplied(ImageFiltered);
+      await onTransfer();
     }
     return null;
   }
 
   Future<void> applyMultyStyle(List<Uint8List> assets) async {
     await model.loadStyleImages(assets);
+    await onTransfer();
+  }
+
+  Future<void> onTransfer() async {
+    await loadingModel;
     Uint8List ImageFiltered = await model.transferAsync();
     await onfilterApplied(ImageFiltered);
   }
@@ -271,18 +278,20 @@ class _StyleTransferPageState extends State<StyleTransferPage> {
   }
 
   void onTapFilter(index) async {
-    if (_selectedStyle == index && index != nbMaxOfStyle && index != -1 ){
+    if (_selectedStyle == index && index != nbMaxOfStyle && index != -1) {
       return setState(() {
         showSlider = !showSlider;
       });
     }
     if (index == nbMaxOfStyle) {
-      if (_selectedStyle == index){
+      if (_selectedStyle == index) {
         setState(() {
           showSlider = !showSlider;
         });
       }
-      await onSelectPicture();
+      if (!showSlider) {
+        await onSelectPicture();
+      }
     } else {
       if (loading == false && (_selectedStyle != index || _selectedStyle == index && this.sliderValue != this._computedSliderValue)) {
         if (index == -1) {
@@ -344,84 +353,78 @@ class _StyleTransferPageState extends State<StyleTransferPage> {
                   child: PreviewImage(_preview, loading, isPressed, _thumbnail)),
             ),
           ),
-          showSlider ? Container(
-            height: sliderHeight, //20
-            width: MediaQuery.of(context).size.width, //100%,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Expanded(
-                  child: Slider(
-                    value: sliderValue.roundToDouble(),
-                    max: 100,
-                    min: 0,
-                    onChanged: (value) => {
-                      setState(() {
-                        sliderValue = value.round();
-                      })
-                    },
-                    onChangeEnd: (value) => {
-                      setState(() {
-                        sliderValue = value.round();
-                      })
-                    },
+          showSlider
+              ? Container(
+                  height: sliderHeight, //20
+                  width: MediaQuery.of(context).size.width, //100%,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Expanded(
+                        child: Slider(
+                          value: sliderValue.roundToDouble(),
+                          max: 100,
+                          min: 0,
+                          onChanged: (value) => {
+                            setState(() {
+                              sliderValue = value.round();
+                            })
+                          },
+                          onChangeEnd: (value) => {
+                            setState(() {
+                              sliderValue = value.round();
+                            })
+                          },
+                        ),
+                      ),
+                      Text("$sliderValue %"),
+                      Padding(
+                        padding: const EdgeInsets.all(3.0),
+                        child: IconButton(
+                            onPressed: () {
+                              setState(() {
+                                loading = true;
+                              });
+                              return onScaleUp();
+                            },
+                            icon: Icon(
+                              sliderValue == _computedSliderValue ? Icons.photo_filter_outlined : Icons.photo_filter,
+                            )),
+                      ),
+                    ],
                   ),
-                ),
-                Text("$sliderValue %"),
-                Padding(
-                  padding: const EdgeInsets.all(3.0),
-                  child: IconButton(
-                      onPressed: () {
-                        setState(() {
-                          loading = true;
-                        });
-                        return onScaleUp();
-                      },
-                      icon: Icon(
-                        sliderValue == _computedSliderValue ? Icons.photo_filter_outlined : Icons.photo_filter,
-                      )),
-                ),
-              ],
-            ),
-          ) : Container(),
+                )
+              : Container(),
 
           //container of the filters
           Container(
-            height: _filterRowHeight, //110
-            child: Center(
-              child: ListView.separated(
+              height: _filterRowHeight, //110
+              child: Center(
+                child: ListView.separated(
                   scrollDirection: Axis.horizontal,
                   itemCount: nbMaxOfStyle + 2,
                   separatorBuilder: (context, index) => Container(height: _filterRowHeight, width: 10),
                   itemBuilder: (context, index) => Padding(
-                        padding: const EdgeInsets.only(top: 5.0, bottom: 5.0),
-                        child: Container(
-                            height: 100,
-                            width: 100,
-                            //height 110 - ( 5 + 5)
-                            decoration: BoxDecoration(
-                              border: Border.all(color: _selectedStyle == index - 1 ? Theme.of(context).colorScheme.secondary : Colors.black26),
-                            ),
-                            child: InkWell(
-                                onTap: () => onTapFilter(index - 1),
-                                child: index == 0
-                                    ? widget.previewImage
-                                    : index == nbMaxOfStyle + 1
-                                        ? Icon(
-                                            Icons.image,
-                                            size: 80,
-                                          )
-                                        : Image.asset(
-                                            "assets/styles/style${index - 1}.jpg",
-                                            fit: BoxFit.cover,
-                                            filterQuality: FilterQuality.high,
-                                            cacheHeight: 126,
-                                            cacheWidth: 126,
-                                          ))),
-                      )),
-            ),
-          ),
+                      padding: const EdgeInsets.only(top: 5.0, bottom: 5.0),
+                      child: (index == 0 || index == nbMaxOfStyle + 1)
+                          ? Container(
+                              height: 100,
+                              width: 100,
+                              decoration: BoxDecoration(
+                                border: Border.all(color: _selectedStyle == index - 1 ? Theme.of(context).colorScheme.secondary : Colors.black26),
+                              ),
+                              child: InkWell(
+                                  onTap: () => onTapFilter(index - 1),
+                                  child: index == 0
+                                      ? widget.previewImage
+                                      : /*index == nbMaxOfStyle + 1*/ Icon(
+                                          Icons.image,
+                                          size: 80,
+                                        )))
+                          : FilterIcon((_selectedStyle == index - 1), () => onTapFilter(index - 1), "assets/styles/style${index - 1}.jpg", "Text")),
+                ),
+              ))
         ],
       ),
     );

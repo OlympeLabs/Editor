@@ -1,9 +1,11 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:photo_manager/photo_manager.dart';
 import 'dart:typed_data';
 import 'package:image/image.dart' as img;
 
-
+///this is the dropdown menu that display all of the List<AssetPathEntity> [albums] given as parametter, and will execute [onSelection] when a new one is selected
 class DropDownAlbums extends StatelessWidget {
   final List<AssetPathEntity> albums;
   final Function onSelection;
@@ -19,7 +21,10 @@ class DropDownAlbums extends StatelessWidget {
           child: Container(
             child: Padding(
               padding: const EdgeInsets.all(8.0),
-              child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text(albums[i].name), Text("${albums[i].assetCount}")]),
+              child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+                Text(albums[i].name),
+                Text("${albums[i].assetCount}")
+              ]),
             ),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(5.0),
@@ -33,6 +38,11 @@ class DropDownAlbums extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return PopupMenuButton<int>(
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.all(
+          Radius.circular(10.0),
+        ),
+      ),
       initialValue: selectedAlbumIndex,
       child: Container(
         child: Padding(
@@ -57,10 +67,10 @@ class DropDownAlbums extends StatelessWidget {
   }
 }
 
+///this class display all of the picture contained in the AssetPathEntity [album] passed as argument and will execute the Function [onSelect] when a picture is selected
 class AlbumViewer extends StatefulWidget {
   final AssetPathEntity album;
   final Function onSelect;
-
 
   AlbumViewer({Key key, @required this.album, this.onSelect}) : super(key: key);
 
@@ -68,12 +78,12 @@ class AlbumViewer extends StatefulWidget {
   static final int pagesize = crossCount * 10;
   static final int separatorSize = 10;
   static final int thumbnailSize = 150;
-  static const SliverGridDelegate gridDelegate  = const SliverGridDelegateWithMaxCrossAxisExtent(
-                  maxCrossAxisExtent: 125.0,
-                  mainAxisSpacing: 0,
-                  crossAxisSpacing: 0,
-                  childAspectRatio: 1.0,
-                );
+  static const SliverGridDelegate gridDelegate = const SliverGridDelegateWithMaxCrossAxisExtent(
+    maxCrossAxisExtent: 125.0,
+    mainAxisSpacing: 0,
+    crossAxisSpacing: 0,
+    childAspectRatio: 1.0,
+  );
 
   @override
   State<AlbumViewer> createState() => _AlbumViewerState();
@@ -150,9 +160,7 @@ class _AlbumViewerState extends State<AlbumViewer> {
                     width: 100,
                     height: 100,
                     child: media[i].type == AssetType.video
-                        ? Align(
-                            alignment: Alignment.bottomLeft,
-                            child: Padding(padding: EdgeInsets.only(right: 5, bottom: 5), child: Text("${(media[i].duration / 60).ceil() - 1}:${media[i].duration % 60}")))
+                        ? Align(alignment: Alignment.bottomLeft, child: Padding(padding: EdgeInsets.only(right: 5, bottom: 5), child: Text("${(media[i].duration / 60).ceil() - 1}:${media[i].duration % 60}")))
                         : Image.memory(
                             snapshot.data,
                             fit: BoxFit.cover,
@@ -189,29 +197,49 @@ class _AlbumViewerState extends State<AlbumViewer> {
     if (index != selectedIndex) {
       setState(() {
         selectedIndex = index;
-        _selectedMedia = Container(
-            height: 300,
-            child: FutureBuilder(
-              future: asset.thumbDataWithSize(300, 300),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.done) {
-                  _selectedMediaSource = snapshot.data;
-                  return Image.memory(
-                    ComputeThumbnails(snapshot.data, 300),
-                    cacheHeight: 300,
-                    cacheWidth: 300,
-                    fit: BoxFit.contain,
-                  );
+        _selectedMedia = FutureBuilder(
+          future: asset.thumbDataWithSize(300, 300),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.done) {
+              _selectedMediaSource = snapshot.data;
+              return Stack(
+                alignment: Alignment.center,
+                children: [
+                  Container(
+                    height: 300,
+                    width: 500,
+                    decoration: BoxDecoration(
+                      image: DecorationImage(image: MemoryImage(snapshot.data), fit: BoxFit.cover),
+                    ),
+                    child: BackdropFilter(
+                        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                        child: Container(
+                          decoration: BoxDecoration(color: Theme.of(context).backgroundColor.withOpacity(0.5)),
+                        )),
+                  ),
+                  Container(
+                    height: 300,
+                    child: Image.memory(
+                      ComputeThumbnails(snapshot.data, 300),
+                      cacheHeight: 300,
+                      cacheWidth: 300,
+                      fit: BoxFit.contain,
+                    ),
+                  ),
+                ],
+              );
 
-                  /* Image.memory(
+              /* Image.memory(
                       snapshot.data,
                       fit: BoxFit.contain,
                     ); */
-                }
-                return Container();
-              },
-              initialData: _selectedMediaSource != null ? _selectedMediaSource : null,
-            ));
+            }
+            return Container(
+              height: 300,
+            );
+          },
+          initialData: _selectedMediaSource != null ? _selectedMediaSource : null,
+        );
       });
     }
 
@@ -230,21 +258,20 @@ class _AlbumViewerState extends State<AlbumViewer> {
         children: [
           this._selectedMedia,
           Expanded(
-            child: AssetGrid(_mediaList, [selectedIndex])
-          ),
+              child: AssetGrid(_mediaList, [
+            selectedIndex
+          ])),
         ],
       ),
     );
   }
 }
 
-
 class AssetSelector extends StatefulWidget {
   final AssetPathEntity album;
   final Function onUpdateSelection;
 
-
-  const AssetSelector({ Key key , this.album, this.onUpdateSelection}) : super(key: key);
+  const AssetSelector({Key key, this.album, this.onUpdateSelection}) : super(key: key);
 
   @override
   State<AssetSelector> createState() => _AssetSelectorState();
@@ -253,8 +280,8 @@ class AssetSelector extends StatefulWidget {
 class _AssetSelectorState extends State<AssetSelector> {
   List<Widget> _mediaList = [];
   List<int> selectedIndexes = [];
-  Map<int,AssetEntity> selectedAssets = {};
-  
+  Map<int, AssetEntity> selectedAssets = {};
+
   int currentPage = 0;
   int lastPage;
 
@@ -264,12 +291,11 @@ class _AssetSelectorState extends State<AssetSelector> {
     _fetchNewMedia();
   }
 
-  
   void onSelect(int index, AssetEntity asset) {
-    if(selectedIndexes.contains(index)){
+    if (selectedIndexes.contains(index)) {
       selectedIndexes.remove(index);
       selectedAssets[index] = null;
-    }else{
+    } else {
       selectedIndexes.add(index);
       selectedAssets[index] = asset;
     }
@@ -319,9 +345,9 @@ class _AssetSelectorState extends State<AssetSelector> {
                     width: 100,
                     height: 100,
                     child: Image.memory(
-                            snapshot.data,
-                            fit: BoxFit.cover,
-                          ),
+                      snapshot.data,
+                      fit: BoxFit.cover,
+                    ),
                     decoration: BoxDecoration(
                       color: Theme.of(context).colorScheme.surface,
                       borderRadius: BorderRadius.circular(5.0),
@@ -350,8 +376,7 @@ class _AssetSelectorState extends State<AssetSelector> {
     }
   }
 
-
-   void _handleScrollEvent(ScrollNotification scroll) {
+  void _handleScrollEvent(ScrollNotification scroll) {
     if (scroll.metrics.pixels / scroll.metrics.maxScrollExtent > 0.33) {
       if (currentPage != lastPage) {
         _fetchNewMedia();
@@ -362,43 +387,48 @@ class _AssetSelectorState extends State<AssetSelector> {
   @override
   Widget build(BuildContext context) {
     return NotificationListener<ScrollNotification>(
-      onNotification: (ScrollNotification scroll) {
-        _handleScrollEvent(scroll);
-        return;
-      },
-      child: AssetGrid(_mediaList, selectedIndexes)
-    );
+        onNotification: (ScrollNotification scroll) {
+          _handleScrollEvent(scroll);
+          return;
+        },
+        child: AssetGrid(_mediaList, selectedIndexes));
   }
 }
 
 class AssetGrid extends StatelessWidget {
   final List<Widget> _mediaList;
   final List<int> selectedIndexes;
-  const AssetGrid(this._mediaList, this.selectedIndexes, { Key key }) : super(key: key);
+  const AssetGrid(this._mediaList, this.selectedIndexes, {Key key}) : super(key: key);
+
+  //the width of the border of the selected image
+  static const double widthBorder = 2;
+  static const double borderRadius = 20.0;
 
   @override
   Widget build(BuildContext context) {
-    return _mediaList.length!= 0 
-      ? GridView.builder(
-                  gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                  maxCrossAxisExtent: 125.0,
-                  mainAxisSpacing: 0,
-                  crossAxisSpacing: 0,
-                  childAspectRatio: 1.0,
+    return _mediaList.length != 0
+        ? GridView.builder(
+            gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+              maxCrossAxisExtent: 125.0,
+              mainAxisSpacing: 0,
+              crossAxisSpacing: 0,
+              childAspectRatio: 1.0,
+            ),
+            itemCount: _mediaList.length,
+            itemBuilder: (context, index) {
+              return Container(
+                height: 105,
+                width: 105,
+                child: ClipRRect(borderRadius: BorderRadius.circular(borderRadius), child: _mediaList[index]),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surface,
+                  border: Border.all(color: selectedIndexes.contains(index) ? Theme.of(context).colorScheme.secondary : Theme.of(context).colorScheme.background, width: widthBorder),
+                  borderRadius: BorderRadius.circular(borderRadius + widthBorder),
                 ),
-                  itemCount: _mediaList.length,
-                  itemBuilder: (context, index) {
-                    return Container(
-                      height: 105,
-                      width: 105,
-                      child: _mediaList[index],
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.surface,
-                        border: Border.all(color: selectedIndexes.contains(index) ? Theme.of(context).colorScheme.secondary : Theme.of(context).colorScheme.background, width: 5),
-                        borderRadius: BorderRadius.circular(5.0),
-                      ),
-                    );
-                  })
-                  : Center(child: Text("No picture in this album"),);
+              );
+            })
+        : Center(
+            child: Text("No picture in this album"),
+          );
   }
 }

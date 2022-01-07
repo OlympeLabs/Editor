@@ -1,11 +1,11 @@
 import 'dart:math';
 import 'package:image/image.dart' as img;
 
-
+//use the original image to add the original noise to the computted Image
 List<int> noiseUpScaling(Map<String, List<int>> map) {
   List<int> original = map["original"];
   List<int> computed = map["computed"];
-  double ratio = (map["ratio"][0] / 30)+1;
+  double ratio = (map["ratio"][0] / 30) + 1;
 
   img.Image originalImage = img.decodeImage(original);
   img.Image computedImage = img.decodeImage(computed);
@@ -18,6 +18,7 @@ List<int> noiseUpScaling(Map<String, List<int>> map) {
   int convolutionradius = 1;
   List<double> convolutionMask = [0, 0.1, 0, 0.1, 0.6, 0.1, 0, 0.1, 0];
   img.Image upscaledImage = img.Image.rgb(width, height);
+  //complexity : O((W*H) * ([convolutionradius]+2)²)
   for (var x = 0; x < width; x++) {
     for (var y = 0; y < height; y++) {
       if (x >= convolutionradius && x < width - convolutionradius && y >= convolutionradius && y < height - convolutionradius) {
@@ -26,11 +27,13 @@ List<int> noiseUpScaling(Map<String, List<int>> map) {
         for (int i = -convolutionradius; i <= convolutionradius; i++) {
           for (int j = -convolutionradius; j <= convolutionradius; j++) {
             //if(convolutionMask[index] != 0){
-            int pixelX = max(min(x + i, width), 0);
-            int pixelY = max(min(y + j, height), 0);
-            List<int> rgb = abgrToRGB(originalImage.getPixel(pixelX, pixelY));
-            double lum = (rgb[0] + rgb[1] + rgb[2]) / 3;
-            convolutionFactor += lum * convolutionMask[index];
+            if(convolutionMask[index] > 0.0){
+              int pixelX = max(min(x + i, width), 0);
+              int pixelY = max(min(y + j, height), 0);
+              List<int> rgb = abgrToRGB(originalImage.getPixel(pixelX, pixelY));
+              double lum = (rgb[0] + rgb[1] + rgb[2]) / 3;
+              convolutionFactor += lum * convolutionMask[index];
+            }
             index++;
             //}
           }
@@ -65,12 +68,10 @@ List<int> abgrToRGB(int abgr) {
   return [r, g, b];
 }
 
-
- List<int> computeThumbnailsByWidth(Map<String, List<int>> map) {
+List<int> computeThumbnailsByWidth(Map<String, List<int>> map) {
   List<int> imgBytes = map["imgBytes"];
-  int maxWidth  = map["maxWidth"][0];
+  int maxWidth = map["maxWidth"][0];
 
-  
   img.Image originalImage = img.decodeImage(imgBytes);
   int originalW = originalImage.width;
   int originalH = originalImage.height;

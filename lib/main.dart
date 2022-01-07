@@ -1,5 +1,6 @@
 // @dart=2.9
 import 'package:Editeur/UI/Home.dart';
+import 'package:Editeur/UI/selectionImagePage.dart';
 import 'package:flutter/material.dart';
 
 
@@ -30,7 +31,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: "L'Editeur",
       theme: ThemeData.from(colorScheme: darkTheme),
-      home: MyHomePage(),
+      home: SelectionImagePage(),
     );
   }
 }

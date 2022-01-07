@@ -10,5 +10,8 @@ using the tensorflow tutorial [style_transfer](https://www.tensorflow.org/lite/e
 
 ### credits
 
-Icons  conevas made by [Freepik](https://www.flaticon.com/authors/freepik) from [www.flaticon.com](https://www.flaticon.com/)
-Icon Take a picture made by  by [Iconixar](https://www.flaticon.com/authors/iconixar) from [www.flaticon.com](https://www.flaticon.com/)
+
+flutter pub add cloud_firestore
+flutterfire configure
+error upgrade min sdk version to 19 in android\app\build.gradle run (multidex enabled ?)
+https://firebase.flutter.dev/docs/firestore/usage

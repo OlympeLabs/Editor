@@ -16,6 +16,7 @@ class SelectionImagePage extends StatefulWidget {
 
 class _SelectionImagePageState extends State<SelectionImagePage> {
   FutureOr<List<AssetPathEntity>> albums;
+
   int selectedAlbumIndex = 0;
   Uint8List selectedPictureData;
   Widget selectedPicturePreview;
@@ -24,14 +25,30 @@ class _SelectionImagePageState extends State<SelectionImagePage> {
 
   ScrollController myScrollController = ScrollController();
 
+  Future<PermissionState> allowed;
+
   @override
   void initState() {
     super.initState();
-    getAlbums();
+    init();
+  }
+
+  Future<bool> init() {
+    allowed = getPerm();
+    return Future.value(allowed).then((result) {
+      if (result.isAuth) {
+        getAlbums();
+      }
+      return result.isAuth;
+    });
+  }
+
+  Future<PermissionState> getPerm() async {
+    return await PhotoManager.requestPermissionExtend();
   }
 
   void getAlbums() async {
-    await PhotoManager.getAssetPathList(type: RequestType.image).then((value) {
+    PhotoManager.getAssetPathList(type: RequestType.image).then((value) {
       value.sort((AssetPathEntity a, AssetPathEntity b) => a.isAll ? -1 : a.name.toLowerCase().compareTo(b.name.toLowerCase()));
       setState(() {
         albums = value;
@@ -57,55 +74,74 @@ class _SelectionImagePageState extends State<SelectionImagePage> {
   @override
   Widget build(BuildContext context) {
     return FutureBuilder(
-        future: Future.value(albums),
+        future: Future.value(allowed).then((result) async => await Future.value(albums)),
         builder: (context, snapshot) {
-          return Scaffold(
-            appBar: AppBar(
-  
-              actions: [
-                AspectRatio(
-                  aspectRatio: 1,
-                  child: IconButton(
-                    splashRadius: 35,
-                      icon:  Icon(Icons.arrow_back),
-                      onPressed: () => Navigator.pop(context),
+          if (snapshot.connectionState == ConnectionState.done && snapshot.data != null) {
+            return Scaffold(
+              appBar: AppBar(
+                actions: [
+                  Container(
+                    child: Padding(
+                        padding: const EdgeInsets.all(8.0),
+                        child: DropDownAlbums(
+                          albums: snapshot.data as List<AssetPathEntity>,
+                          selectedAlbumIndex: selectedAlbumIndex,
+                          onSelection: onSelectAlbum,
+                        )),
+                    decoration: BoxDecoration(borderRadius: BorderRadius.circular(25.0)),
                   ),
-                ),
-                //InkWell(child: Icon(Icons.arrow_back), onTap: () => Navigator.pop(context),),
-                Container(
-                  child: Padding(
-                    padding: const EdgeInsets.all(8.0),
-                    child: snapshot.connectionState == ConnectionState.done
-                        ? DropDownAlbums(
-                            albums: snapshot.data as List<AssetPathEntity>,
-                            selectedAlbumIndex: selectedAlbumIndex,
-                            onSelection: onSelectAlbum,
-                          )
-                        : Container(),
+                  Expanded(
+                    child: Container(),
                   ),
-                  decoration: BoxDecoration(borderRadius: BorderRadius.circular(25.0)),
-                ),
-
-                Expanded(
-                  child: Container(),
-                ),
-                AspectRatio(
-                  aspectRatio: 1,
-                  child: IconButton(
-                    splashRadius: 35,
-                    icon:  Icon(Icons.mode_edit),
-                    onPressed: () => {this.selectedPictureData != null ? Navigator.push(context, MaterialPageRoute(builder: (context) => StyleTransferPage(this.selectedPictureData, this.selectedPicturePreview))) : print("select an Image")}),
-                ),
-              ],
-            ),
-            body: snapshot.connectionState == ConnectionState.done ? AlbumViewer(album: (snapshot.data as List<AssetPathEntity>)[selectedAlbumIndex], onSelect: onSelectPhoto) : Container()
-            /* Column(
+                  AspectRatio(
+                    aspectRatio: 1,
+                    child: IconButton(
+                        splashRadius: 35,
+                        icon: Icon(Icons.mode_edit),
+                        onPressed: () => {
+                              this.selectedPictureData != null ? Navigator.push(context, MaterialPageRoute(builder: (context) => StyleTransferPage(this.selectedPictureData, this.selectedPicturePreview))) : print("select an Image")
+                            }),
+                  ),
+                ],
+              ),
+              body: AlbumViewer(album: (snapshot.data as List<AssetPathEntity>)[selectedAlbumIndex], onSelect: onSelectPhoto),
+              /* Column(
               children: [
                 
                 
               ],
             ), */
-          );
+            );
+          } else {
+            return Scaffold(
+              body: Container(
+                width: MediaQuery.of(context).size.width * 4 / 5,
+                child: Center(
+                  child: FutureBuilder(
+                      future: Future.value(allowed),
+                      builder: (context, permSnapshot) {
+                        if (permSnapshot.connectionState == ConnectionState.done && !(permSnapshot.data as PermissionState).isAuth) {
+                          return Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text("The application need access to your gallery to display your photos"),
+                              TextButton(
+                                onPressed: () async {
+                                  bool isAlowed = await init();
+                                  if (!isAlowed) PhotoManager.openSetting();
+                                },
+                                child: Text("Continue"),
+                              ),
+                            ],
+                          );
+                        } else {
+                          return CircularProgressIndicator();
+                        }
+                      }),
+                ),
+              ),
+            );
+          }
         });
   }
 }
