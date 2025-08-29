@@ -3,29 +3,28 @@ import 'dart:typed_data';
 
 import 'package:Editeur/GalleryParts/gallerySelector.dart';
 import 'package:Editeur/UI/styleTranferPage.dart';
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:photo_manager/photo_manager.dart';
 
 class SelectionImagePage extends StatefulWidget {
-  const SelectionImagePage({Key key}) : super(key: key);
+  const SelectionImagePage({super.key});
 
   @override
   State<SelectionImagePage> createState() => _SelectionImagePageState();
 }
 
 class _SelectionImagePageState extends State<SelectionImagePage> {
-  FutureOr<List<AssetPathEntity>> albums;
+  late FutureOr<List<AssetPathEntity>> albums;
 
   int selectedAlbumIndex = 0;
-  Uint8List selectedPictureData;
-  Widget selectedPicturePreview;
+  Uint8List? selectedPictureData;
+  Widget? selectedPicturePreview;
 
   final double appBarSize = 50.0;
 
   ScrollController myScrollController = ScrollController();
 
-  Future<PermissionState> allowed;
+  late Future<PermissionState> allowed;
 
   @override
   void initState() {
@@ -35,7 +34,8 @@ class _SelectionImagePageState extends State<SelectionImagePage> {
 
   Future<bool> init() {
     allowed = getPerm();
-    return Future.value(allowed).then((result) {
+    return Future<PermissionState>.value(allowed)
+        .then((PermissionState result) {
       if (result.isAuth) {
         getAlbums();
       }
@@ -48,8 +48,10 @@ class _SelectionImagePageState extends State<SelectionImagePage> {
   }
 
   void getAlbums() async {
-    PhotoManager.getAssetPathList(type: RequestType.image).then((value) {
-      value.sort((AssetPathEntity a, AssetPathEntity b) => a.isAll ? -1 : a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+    PhotoManager.getAssetPathList(type: RequestType.image)
+        .then((List<AssetPathEntity> value) {
+      value.sort((AssetPathEntity a, AssetPathEntity b) =>
+          a.isAll ? -1 : a.name.toLowerCase().compareTo(b.name.toLowerCase()));
       setState(() {
         albums = value;
       });
@@ -63,23 +65,30 @@ class _SelectionImagePageState extends State<SelectionImagePage> {
     });
   }
 
-  Future<void> onSelectPhoto(AssetEntity selectedAsset, Widget previewImage) async {
+  Future<void> onSelectPhoto(
+      AssetEntity selectedAsset, Widget previewImage) async {
     selectedPicturePreview = previewImage;
-    await selectedAsset.originBytes.then((Uint8List image) {
-      selectedPictureData = image;
+    await selectedAsset.originBytes.then((Uint8List? image) {
+      if (image != null) {
+        selectedPictureData = image;
+      }
       //return Navigator.push(context, MaterialPageRoute(builder: (context) => EditionPage(image)));
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder(
-        future: Future.value(allowed).then((result) async => await Future.value(albums)),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.done && snapshot.data != null) {
+    return FutureBuilder<List<AssetPathEntity>>(
+        future: Future<PermissionState>.value(allowed).then(
+            (PermissionState result) async =>
+                await Future<List<AssetPathEntity>>.value(albums)),
+        builder: (BuildContext context,
+            AsyncSnapshot<List<AssetPathEntity>> snapshot) {
+          if (snapshot.connectionState == ConnectionState.done &&
+              snapshot.data != null) {
             return Scaffold(
               appBar: AppBar(
-                actions: [
+                actions: <Widget>[
                   Container(
                     child: Padding(
                         padding: const EdgeInsets.all(8.0),
@@ -88,7 +97,8 @@ class _SelectionImagePageState extends State<SelectionImagePage> {
                           selectedAlbumIndex: selectedAlbumIndex,
                           onSelection: onSelectAlbum,
                         )),
-                    decoration: BoxDecoration(borderRadius: BorderRadius.circular(25.0)),
+                    decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(25.0)),
                   ),
                   Expanded(
                     child: Container(),
@@ -96,15 +106,28 @@ class _SelectionImagePageState extends State<SelectionImagePage> {
                   AspectRatio(
                     aspectRatio: 1,
                     child: IconButton(
-                        splashRadius: 35,
-                        icon: Icon(Icons.mode_edit),
-                        onPressed: () => {
-                              this.selectedPictureData != null ? Navigator.push(context, MaterialPageRoute(builder: (context) => StyleTransferPage(this.selectedPictureData, this.selectedPicturePreview))) : print("select an Image")
-                            }),
+                      splashRadius: 35,
+                      icon: Icon(Icons.mode_edit),
+                      onPressed: () => this.selectedPictureData != null &&
+                              this.selectedPicturePreview != null
+                          ? Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                  builder: (BuildContext context) =>
+                                      StyleTransferPage(
+                                        imgBytes: this.selectedPictureData!,
+                                        previewImage:
+                                            this.selectedPicturePreview!,
+                                      )))
+                          : print("select an Image"),
+                    ),
                   ),
                 ],
               ),
-              body: AlbumViewer(album: (snapshot.data as List<AssetPathEntity>)[selectedAlbumIndex], onSelect: onSelectPhoto),
+              body: AlbumViewer(
+                  album: (snapshot.data
+                      as List<AssetPathEntity>)[selectedAlbumIndex],
+                  onSelect: onSelectPhoto),
               /* Column(
               children: [
                 
@@ -119,12 +142,16 @@ class _SelectionImagePageState extends State<SelectionImagePage> {
                 child: Center(
                   child: FutureBuilder(
                       future: Future.value(allowed),
-                      builder: (context, permSnapshot) {
-                        if (permSnapshot.connectionState == ConnectionState.done && !(permSnapshot.data as PermissionState).isAuth) {
+                      builder:
+                          (BuildContext context, AsyncSnapshot permSnapshot) {
+                        if (permSnapshot.connectionState ==
+                                ConnectionState.done &&
+                            !permSnapshot.data.isAuth) {
                           return Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Text("The application need access to your gallery to display your photos"),
+                              Text(
+                                  "The application need access to your gallery to display your photos"),
                               TextButton(
                                 onPressed: () async {
                                   bool isAlowed = await init();

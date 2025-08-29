@@ -1,8 +1,5 @@
-// @dart=2.9
-import 'package:Editeur/UI/Home.dart';
 import 'package:Editeur/UI/selectionImagePage.dart';
 import 'package:flutter/material.dart';
-
 
 void main() {
   runApp(MyApp());
@@ -10,13 +7,9 @@ void main() {
 
 class MyApp extends StatelessWidget {
   final ColorScheme darkTheme = ColorScheme(
-    background: Color(0xff001B2E),
-    onBackground: Color(0xFFE0F1FD),
     primary: Color(0xff99E0FF),
-    primaryVariant: Color(0xff005980),
     onPrimary: Color(0xff001B2E),
     secondary: Color(0xffFFEBFF),
-    secondaryVariant: Color(0xffcc66cc),
     onSecondary: Color(0xff001B2E),
     error: Color(0xff750D37),
     onError: Color(0xffffffff),
@@ -24,7 +17,7 @@ class MyApp extends StatelessWidget {
     onSurface: Color(0xffffffff),
     brightness: Brightness.dark,
   );
- 
+
   // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {

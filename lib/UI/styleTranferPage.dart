@@ -1,4 +1,3 @@
-import 'dart:typed_data';
 import 'package:Editeur/GalleryParts/gallerySelector.dart';
 import 'package:Editeur/UI/savingPage.dart';
 import 'package:Editeur/UsefullWidget/filterIcon.dart';
@@ -10,29 +9,36 @@ import 'package:flutter/material.dart';
 import 'package:photo_manager/photo_manager.dart';
 
 class StyleTransferPage extends StatefulWidget {
+  StyleTransferPage({
+    required this.imgBytes,
+    required this.previewImage,
+  });
   final Uint8List imgBytes;
   final Widget previewImage;
-  StyleTransferPage(this.imgBytes, this.previewImage);
 
   @override
   _StyleTransferPageState createState() => _StyleTransferPageState();
 }
 
 class _StyleTransferPageState extends State<StyleTransferPage> {
-  final _filterRowHeight = 132.0;
-  final sliderHeight = 40.0;
-  final _appbarSize = 80.0;
-  Uint8List _computedImage;
-  Uint8List _computedImageScaled;
-  Uint8List _preview;
-  Uint8List _thumbnail;
+  final double _filterRowHeight = 132.0;
+  final double sliderHeight = 40.0;
+  final double _appbarSize = 80.0;
+
+  Uint8List? _computedImage;
+  Uint8List? _computedImageScaled;
+
+  late Uint8List _preview;
+  late Uint8List _thumbnail;
+
   int _selectedStyle = -1;
   Transfer model = Transfer();
   bool loading = true;
   bool isPressed = false;
-  final nbMaxOfStyle = 6;
-  List<String> stylePaths = [];
-  int _computedSliderValue;
+  final int nbMaxOfStyle = 6;
+  List<String> stylePaths = <String>[];
+
+  late int _computedSliderValue;
 
   bool showSlider = false;
   int sliderValue = 80;
@@ -42,11 +48,10 @@ class _StyleTransferPageState extends State<StyleTransferPage> {
   int selectedAlbumIndex = 0;
   bool willApply = false;
   List<AssetEntity> selectedAssets = [];
-  AssetPathEntity selectedAlbum;
+  AssetPathEntity? selectedAlbum;
+  AssetEntity? savedImage;
 
-  AssetEntity savedImage;
-
-  Future loadingModel;
+  late Future loadingModel;
 
   @override
   void initState() {
@@ -67,17 +72,22 @@ class _StyleTransferPageState extends State<StyleTransferPage> {
 
   Future<void> onScaleUp() async {
     if (_computedImage != null) {
-      await compute(noiseUpScaling, {
-        "original": widget.imgBytes,
-        "computed": _computedImage,
-        "ratio": [this.sliderValue]
-      }).then((List<int> img) async {
+      await compute(
+          noiseUpScaling as ComputeCallback<Map<String, List<int>?>, List<int>>,
+          {
+            "original": widget.imgBytes,
+            "computed": _computedImage,
+            "ratio": <int>[this.sliderValue]
+          }).then((List<int> img) async {
         _computedImageScaled = img as Uint8List;
 
-        compute(computeThumbnailsByWidth, {
-          "imgBytes": _computedImageScaled,
-          "maxWidth": [1000]
-        }).then((List<int> thumbnail) {
+        compute(
+            computeThumbnailsByWidth
+                as ComputeCallback<Map<String, List<int>?>, List<int>>,
+            <String, List<int>?>{
+              "imgBytes": _computedImageScaled,
+              "maxWidth": <int>[1000]
+            }).then((List<int> thumbnail) {
           setState(() {
             _preview = thumbnail as Uint8List;
             loading = false;
@@ -87,8 +97,13 @@ class _StyleTransferPageState extends State<StyleTransferPage> {
     }
   }
 
-  void onSave(context) {
-    if (_computedImageScaled != null) Navigator.push(context, MaterialPageRoute(builder: (context) => SavingPage(_computedImageScaled)));
+  void onSave(BuildContext context) {
+    if (_computedImageScaled != null)
+      Navigator.push(
+          context,
+          MaterialPageRoute(
+              builder: (BuildContext context) =>
+                  SavingPage(_computedImageScaled!)));
   }
 
   /*  Uint8List computeThumbnails(Uint8List imgBytes, {int maxWidth = 1080}) {
@@ -109,34 +124,24 @@ class _StyleTransferPageState extends State<StyleTransferPage> {
     switch (nbImage) {
       case 0:
         return Icons.filter;
-        break;
       case 1:
         return Icons.filter_1;
-        break;
       case 2:
         return Icons.filter_2;
-        break;
       case 3:
         return Icons.filter_3;
-        break;
       case 4:
         return Icons.filter_4;
-        break;
       case 5:
         return Icons.filter_5;
-        break;
       case 6:
         return Icons.filter_6;
-        break;
       case 7:
         return Icons.filter_7;
-        break;
       case 8:
         return Icons.filter_8;
-        break;
       case 9:
         return Icons.filter_9;
-        break;
       default:
         return Icons.filter_9_plus;
     }
@@ -157,7 +162,7 @@ class _StyleTransferPageState extends State<StyleTransferPage> {
   }
 
   Future<void> applyMultyStyle(List<Uint8List> assets) async {
-    await model.loadStyleImages(assets);
+    model.loadStyleImages(assets);
     await onTransfer();
   }
 
@@ -182,11 +187,12 @@ class _StyleTransferPageState extends State<StyleTransferPage> {
   }
 
   Widget modalBuild(BuildContext context, List<AssetPathEntity> albums) {
-    return StatefulBuilder(builder: (BuildContext context, StateSetter setmodalState) {
+    return StatefulBuilder(
+        builder: (BuildContext context, StateSetter setmodalState) {
       return Column(
         children: <Widget>[
           Container(
-            color: Theme.of(context).backgroundColor,
+            color: Theme.of(context).colorScheme.surface,
             child: Padding(
               padding: const EdgeInsets.all(8.0),
               child: Row(
@@ -228,18 +234,19 @@ class _StyleTransferPageState extends State<StyleTransferPage> {
               ),
             ),
           ),
-          Expanded(
-            child: Container(
-              child: AssetSelector(
-                album: selectedAlbum,
-                onUpdateSelection: (List<AssetEntity> selectedAssets) async {
-                  setmodalState(() {
-                    this.selectedAssets = selectedAssets;
-                  });
-                },
+          if (selectedAlbum != null)
+            Expanded(
+              child: Container(
+                child: AssetSelector(
+                  album: selectedAlbum!,
+                  onUpdateSelection: (List<AssetEntity> selectedAssets) async {
+                    setmodalState(() {
+                      this.selectedAssets = selectedAssets;
+                    });
+                  },
+                ),
               ),
             ),
-          ),
         ],
       );
     });
@@ -252,12 +259,19 @@ class _StyleTransferPageState extends State<StyleTransferPage> {
           return modalBuild(context, albums);
         }).then((value) async {
       if (this.selectedAssets.length > 0 && willApply && !refresh) {
-        await Future.wait(this.selectedAssets.map((asset) => asset.thumbDataWithSize(256, 256)).toList()).then((List<Uint8List> assets) async {
+        await Future.wait(this
+                .selectedAssets
+                .map((AssetEntity asset) =>
+                    asset.thumbnailDataWithSize(ThumbnailSize(256, 256)))
+                .toList())
+            .then((List<Uint8List?> assets) async {
           setState(() {
             loading = true;
             _selectedStyle = nbMaxOfStyle;
           });
-          await applyMultyStyle(assets);
+          await applyMultyStyle(assets.where(
+            (Uint8List? element) => element != null,
+          ) as List<Uint8List>);
         });
       } else {
         this.selectedAssets = [];
@@ -265,9 +279,11 @@ class _StyleTransferPageState extends State<StyleTransferPage> {
     });
   }
 
-  void onSelectPicture() async {
-    await PhotoManager.getAssetPathList(type: RequestType.image).then((albums) async {
-      albums.sort((AssetPathEntity a, AssetPathEntity b) => a.isAll ? -1 : a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+  Future<void> onSelectPicture() async {
+    await PhotoManager.getAssetPathList(type: RequestType.image)
+        .then((List<AssetPathEntity> albums) async {
+      albums.sort((AssetPathEntity a, AssetPathEntity b) =>
+          a.isAll ? -1 : a.name.toLowerCase().compareTo(b.name.toLowerCase()));
       selectedAlbum = albums[this.selectedAlbumIndex];
       refresh = true;
       while (this.refresh) {
@@ -293,7 +309,10 @@ class _StyleTransferPageState extends State<StyleTransferPage> {
         await onSelectPicture();
       }
     } else {
-      if (loading == false && (_selectedStyle != index || _selectedStyle == index && this.sliderValue != this._computedSliderValue)) {
+      if (loading == false &&
+          (_selectedStyle != index ||
+              _selectedStyle == index &&
+                  this.sliderValue != this._computedSliderValue)) {
         if (index == -1) {
           return setState(() {
             showSlider = false;
@@ -314,7 +333,7 @@ class _StyleTransferPageState extends State<StyleTransferPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Theme.of(context).backgroundColor,
+      backgroundColor: Theme.of(context).colorScheme.surface,
       appBar: AppBar(
         title: Container(
           height: _appbarSize,
@@ -344,13 +363,19 @@ class _StyleTransferPageState extends State<StyleTransferPage> {
                 });
               },
               child: Listener(
-                  onPointerDown: (event) => {},
-                  onPointerUp: (event) => {
-                        setState(() {
-                          isPressed = false;
-                        })
-                      },
-                  child: PreviewImage(_preview, loading, isPressed, _thumbnail)),
+                onPointerDown: (PointerDownEvent event) => {},
+                onPointerUp: (PointerUpEvent event) => {
+                  setState(() {
+                    isPressed = false;
+                  })
+                },
+                child: PreviewImage(
+                  original: _preview,
+                  loading: loading,
+                  isPressed: isPressed,
+                  preview: _thumbnail,
+                ),
+              ),
             ),
           ),
           showSlider
@@ -366,12 +391,12 @@ class _StyleTransferPageState extends State<StyleTransferPage> {
                           value: sliderValue.roundToDouble(),
                           max: 100,
                           min: 0,
-                          onChanged: (value) => {
+                          onChanged: (double value) => {
                             setState(() {
                               sliderValue = value.round();
                             })
                           },
-                          onChangeEnd: (value) => {
+                          onChangeEnd: (double value) => {
                             setState(() {
                               sliderValue = value.round();
                             })
@@ -382,14 +407,16 @@ class _StyleTransferPageState extends State<StyleTransferPage> {
                       Padding(
                         padding: const EdgeInsets.all(3.0),
                         child: IconButton(
-                            onPressed: () {
+                            onPressed: () async {
                               setState(() {
                                 loading = true;
                               });
                               return onScaleUp();
                             },
                             icon: Icon(
-                              sliderValue == _computedSliderValue ? Icons.photo_filter_outlined : Icons.photo_filter,
+                              sliderValue == _computedSliderValue
+                                  ? Icons.photo_filter_outlined
+                                  : Icons.photo_filter,
                             )),
                       ),
                     ],
@@ -404,15 +431,21 @@ class _StyleTransferPageState extends State<StyleTransferPage> {
                 child: ListView.separated(
                   scrollDirection: Axis.horizontal,
                   itemCount: nbMaxOfStyle + 2,
-                  separatorBuilder: (context, index) => Container(height: _filterRowHeight, width: 10),
-                  itemBuilder: (context, index) => Padding(
+                  separatorBuilder: (BuildContext context, int index) =>
+                      Container(height: _filterRowHeight, width: 10),
+                  itemBuilder: (BuildContext context, int index) => Padding(
                       padding: const EdgeInsets.only(top: 5.0, bottom: 5.0),
                       child: (index == 0 || index == nbMaxOfStyle + 1)
                           ? Container(
                               height: 100,
                               width: 100,
                               decoration: BoxDecoration(
-                                border: Border.all(color: _selectedStyle == index - 1 ? Theme.of(context).colorScheme.secondary : Colors.black26),
+                                border: Border.all(
+                                    color: _selectedStyle == index - 1
+                                        ? Theme.of(context)
+                                            .colorScheme
+                                            .secondary
+                                        : Colors.black26),
                               ),
                               child: InkWell(
                                   onTap: () => onTapFilter(index - 1),
@@ -422,7 +455,12 @@ class _StyleTransferPageState extends State<StyleTransferPage> {
                                           Icons.image,
                                           size: 80,
                                         )))
-                          : FilterIcon((_selectedStyle == index - 1), () => onTapFilter(index - 1), "assets/styles/style${index - 1}.jpg", "Text")),
+                          : FilterIcon(
+                              assetPath: "assets/styles/style${index - 1}.jpg",
+                              isSelected: (_selectedStyle == index - 1),
+                              onTap: () => onTapFilter(index - 1),
+                              title: "Text",
+                            )),
                 ),
               ))
         ],

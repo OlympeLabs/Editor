@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:photo_manager/photo_manager.dart';
-import 'selectionImagePage.dart';
+import 'package:Editeur/UI/selectionImagePage.dart';
 
 class MyHomePage extends StatefulWidget {
-  MyHomePage({Key key}) : super(key: key);
+  MyHomePage({super.key});
 
   @override
   _MyHomePageState createState() => _MyHomePageState();
@@ -17,20 +17,24 @@ class _MyHomePageState extends State<MyHomePage> {
 
   @override
   Widget build(BuildContext context) {
-
     return Scaffold(
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: <Widget>[
             Container(
-              height:  200,
-              width:  200,
+              height: 200,
+              width: 200,
               child: FloatingActionButton(
-                onPressed: ()async{
-                  var result = await PhotoManager.requestPermissionExtend();
+                onPressed: () async {
+                  PermissionState result =
+                      await PhotoManager.requestPermissionExtend();
                   if (result.isAuth) {
-                    return Navigator.push(context, MaterialPageRoute(builder: (context)=> SelectionImagePage()));
+                    await Navigator.push(
+                        context,
+                        MaterialPageRoute<dynamic>(
+                            builder: (BuildContext context) =>
+                                SelectionImagePage()));
                   } else {
                     // fail
                     /// if result is fail, you can call `PhotoManager.openSetting();`  to open android/ios applicaton's setting to get permission
@@ -38,7 +42,8 @@ class _MyHomePageState extends State<MyHomePage> {
                   }
                 },
                 tooltip: 'Select a picture',
-                child: Icon(Icons.image , color: Theme.of(context).cardColor , size: 100),
+                child: Icon(Icons.image,
+                    color: Theme.of(context).cardColor, size: 100),
               ),
             ), // This trailing comma makes auto-formatting nicer for build methods.
           ],

@@ -7,24 +7,39 @@ import 'package:image/image.dart' as img;
 
 ///this is the dropdown menu that display all of the List<AssetPathEntity> [albums] given as parametter, and will execute [onSelection] when a new one is selected
 class DropDownAlbums extends StatelessWidget {
+  const DropDownAlbums({
+    required this.albums,
+    required this.onSelection,
+    required this.selectedAlbumIndex,
+    super.key,
+  });
   final List<AssetPathEntity> albums;
   final Function onSelection;
   final int selectedAlbumIndex;
 
-  const DropDownAlbums({Key key, @required this.albums, @required this.onSelection, @required this.selectedAlbumIndex}) : super(key: key);
-
   List<PopupMenuItem<int>> getMenuEntry(BuildContext context) {
-    List<PopupMenuItem<int>> menuEntries = [];
+    List<PopupMenuItem<int>> menuEntries = <PopupMenuItem<int>>[];
     for (int i = 0; i < albums.length; i++) {
       menuEntries.add(PopupMenuItem<int>(
           value: i,
           child: Container(
             child: Padding(
               padding: const EdgeInsets.all(8.0),
-              child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                Text(albums[i].name),
-                Text("${albums[i].assetCount}")
-              ]),
+              child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(albums[i].name),
+                    FutureBuilder(
+                        future: albums[i].assetCountAsync,
+                        builder: (context, snapshot) {
+                          if (snapshot.connectionState !=
+                                  ConnectionState.done ||
+                              !snapshot.hasData) {
+                            return SizedBox.shrink();
+                          }
+                          return Text("${snapshot.data ?? 0}");
+                        })
+                  ]),
             ),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(5.0),
@@ -69,16 +84,20 @@ class DropDownAlbums extends StatelessWidget {
 
 ///this class display all of the picture contained in the AssetPathEntity [album] passed as argument and will execute the Function [onSelect] when a picture is selected
 class AlbumViewer extends StatefulWidget {
+  AlbumViewer({
+    required this.album,
+    required this.onSelect,
+    super.key,
+  });
   final AssetPathEntity album;
   final Function onSelect;
-
-  AlbumViewer({Key key, @required this.album, this.onSelect}) : super(key: key);
 
   static final int crossCount = 4;
   static final int pagesize = crossCount * 10;
   static final int separatorSize = 10;
   static final int thumbnailSize = 150;
-  static const SliverGridDelegate gridDelegate = const SliverGridDelegateWithMaxCrossAxisExtent(
+  static const SliverGridDelegate gridDelegate =
+      const SliverGridDelegateWithMaxCrossAxisExtent(
     maxCrossAxisExtent: 125.0,
     mainAxisSpacing: 0,
     crossAxisSpacing: 0,
@@ -98,12 +117,12 @@ class _AlbumViewerState extends State<AlbumViewer> {
       child: Text("Select a picture"),
     ),
   );
-  Uint8List _selectedMediaSource;
+  Uint8List? _selectedMediaSource;
   int selectedIndex = -1;
   int currentPage = 0;
   int loadedImages = 0;
 
-  int lastPage;
+  late int lastPage;
 
   @override
   void initState() {
@@ -120,29 +139,41 @@ class _AlbumViewerState extends State<AlbumViewer> {
   }
 
   Uint8List ComputeThumbnails(Uint8List imgBytes, int size) {
-    img.Image originalImage = img.decodeImage(imgBytes);
-    return img.encodeJpg(img.copyResizeCropSquare(originalImage, size));
+    img.Image? originalImage = img.decodeImage(imgBytes);
+    if (originalImage == null) {
+      throw Exception("Error while decoding image");
+    }
+    return img.encodeJpg(img.copyResizeCropSquare(originalImage, size: size));
   }
 
-  _fetchNewMedia() async {
+  Future<void> _fetchNewMedia() async {
     lastPage = currentPage;
-    var result = await PhotoManager.requestPermission();
-    if (result) {
+    PermissionState result = await PhotoManager.requestPermissionExtend();
+    if (result.hasAccess) {
       // success
       //load the media list
-      int nbOfImage = widget.album.assetCount;
+      int nbOfImage = await widget.album.assetCountAsync;
 
       int nbOfPage = (nbOfImage / AlbumViewer.pagesize).ceil();
       if (currentPage < nbOfPage) {
-        List<AssetEntity> media = await widget.album.getAssetListPaged((nbOfPage - 1) - currentPage, AlbumViewer.pagesize);
+        List<AssetEntity> media = await widget.album.getAssetListPaged(
+          page: (nbOfPage - 1) - currentPage,
+          size: AlbumViewer.pagesize,
+        );
 
         media = media.reversed.toList();
-        media.removeWhere((element) => element.type == AssetType.video);
-        while (media.length < AlbumViewer.pagesize && currentPage + 1 < nbOfPage) {
+        media.removeWhere(
+            (AssetEntity element) => element.type == AssetType.video);
+        while (
+            media.length < AlbumViewer.pagesize && currentPage + 1 < nbOfPage) {
           currentPage++;
-          List<AssetEntity> newMedia = await widget.album.getAssetListPaged((nbOfPage - 1) - currentPage, AlbumViewer.pagesize);
+          List<AssetEntity> newMedia = await widget.album.getAssetListPaged(
+            page: (nbOfPage - 1) - currentPage,
+            size: AlbumViewer.pagesize,
+          );
           newMedia = newMedia.reversed.toList();
-          newMedia.removeWhere((element) => element.type == AssetType.video);
+          newMedia.removeWhere(
+              (AssetEntity element) => element.type == AssetType.video);
           media.addAll(newMedia);
         }
 
@@ -151,18 +182,30 @@ class _AlbumViewerState extends State<AlbumViewer> {
 
         for (int i = 0; i < media.length; i++) {
           temp.add(FutureBuilder(
-            future: media[i].thumbDataWithSize(AlbumViewer.thumbnailSize, AlbumViewer.thumbnailSize),
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.done) {
+            future: media[i].thumbnailDataWithSize(
+              ThumbnailSize(
+                AlbumViewer.thumbnailSize,
+                AlbumViewer.thumbnailSize,
+              ),
+            ),
+            builder:
+                (BuildContext context, AsyncSnapshot<Uint8List?> snapshot) {
+              if (snapshot.connectionState == ConnectionState.done &&
+                  snapshot.data != null) {
                 return InkWell(
                   onTap: () => onSelect(i + indexStart, media[i]),
                   child: Container(
                     width: 100,
                     height: 100,
                     child: media[i].type == AssetType.video
-                        ? Align(alignment: Alignment.bottomLeft, child: Padding(padding: EdgeInsets.only(right: 5, bottom: 5), child: Text("${(media[i].duration / 60).ceil() - 1}:${media[i].duration % 60}")))
+                        ? Align(
+                            alignment: Alignment.bottomLeft,
+                            child: Padding(
+                                padding: EdgeInsets.only(right: 5, bottom: 5),
+                                child: Text(
+                                    "${(media[i].duration / 60).ceil() - 1}:${media[i].duration % 60}")))
                         : Image.memory(
-                            snapshot.data,
+                            snapshot.data!,
                             fit: BoxFit.cover,
                           ),
                     decoration: BoxDecoration(
@@ -198,10 +241,11 @@ class _AlbumViewerState extends State<AlbumViewer> {
       setState(() {
         selectedIndex = index;
         _selectedMedia = FutureBuilder(
-          future: asset.thumbDataWithSize(300, 300),
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.done) {
-              _selectedMediaSource = snapshot.data;
+          future: asset.thumbnailDataWithSize(ThumbnailSize(300, 300)),
+          builder: (BuildContext context, AsyncSnapshot<Uint8List?> snapshot) {
+            if (snapshot.connectionState == ConnectionState.done &&
+                snapshot.data != null) {
+              _selectedMediaSource = snapshot.data!;
               return Stack(
                 alignment: Alignment.center,
                 children: [
@@ -209,18 +253,25 @@ class _AlbumViewerState extends State<AlbumViewer> {
                     height: 300,
                     width: 500,
                     decoration: BoxDecoration(
-                      image: DecorationImage(image: MemoryImage(snapshot.data), fit: BoxFit.cover),
+                      image: DecorationImage(
+                        image: MemoryImage(_selectedMediaSource!),
+                        fit: BoxFit.cover,
+                      ),
                     ),
                     child: BackdropFilter(
                         filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
                         child: Container(
-                          decoration: BoxDecoration(color: Theme.of(context).backgroundColor.withOpacity(0.5)),
+                          decoration: BoxDecoration(
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .surface
+                                  .withAlpha(125)),
                         )),
                   ),
                   Container(
                     height: 300,
                     child: Image.memory(
-                      ComputeThumbnails(snapshot.data, 300),
+                      ComputeThumbnails(_selectedMediaSource!, 300),
                       cacheHeight: 300,
                       cacheWidth: 300,
                       fit: BoxFit.contain,
@@ -238,7 +289,7 @@ class _AlbumViewerState extends State<AlbumViewer> {
               height: 300,
             );
           },
-          initialData: _selectedMediaSource != null ? _selectedMediaSource : null,
+          initialData: _selectedMediaSource,
         );
       });
     }
@@ -252,15 +303,12 @@ class _AlbumViewerState extends State<AlbumViewer> {
     return NotificationListener<ScrollNotification>(
       onNotification: (ScrollNotification scroll) {
         _handleScrollEvent(scroll);
-        return;
+        return false;
       },
       child: Column(
-        children: [
+        children: <Widget>[
           this._selectedMedia,
-          Expanded(
-              child: AssetGrid(_mediaList, [
-            selectedIndex
-          ])),
+          Expanded(child: AssetGrid(_mediaList, <int>[selectedIndex])),
         ],
       ),
     );
@@ -268,22 +316,25 @@ class _AlbumViewerState extends State<AlbumViewer> {
 }
 
 class AssetSelector extends StatefulWidget {
+  const AssetSelector({
+    required this.album,
+    required this.onUpdateSelection,
+    super.key,
+  });
   final AssetPathEntity album;
   final Function onUpdateSelection;
-
-  const AssetSelector({Key key, this.album, this.onUpdateSelection}) : super(key: key);
 
   @override
   State<AssetSelector> createState() => _AssetSelectorState();
 }
 
 class _AssetSelectorState extends State<AssetSelector> {
-  List<Widget> _mediaList = [];
-  List<int> selectedIndexes = [];
-  Map<int, AssetEntity> selectedAssets = {};
+  List<Widget> _mediaList = <Widget>[];
+  List<int> selectedIndexes = <int>[];
+  Map<int, AssetEntity?> selectedAssets = <int, AssetEntity?>{};
 
   int currentPage = 0;
-  int lastPage;
+  late int lastPage;
 
   @override
   void initState() {
@@ -299,35 +350,42 @@ class _AssetSelectorState extends State<AssetSelector> {
       selectedIndexes.add(index);
       selectedAssets[index] = asset;
     }
-    List<AssetEntity> selectedAsset = selectedAssets.values.toList();
-    selectedAsset.removeWhere((element) => element == null);
-    List<int> selectedIndex = selectedAssets.keys.toList();
-    selectedIndex.removeWhere((element) => selectedAssets[element] == null);
-
+    List<AssetEntity> selectedAsset = selectedAssets.values
+        .where((AssetEntity? element) => element != null)
+        .toList() as List<AssetEntity>;
+    List<int> selectedIndex = selectedAssets.keys
+        .where((int index) => selectedAssets[index] != null)
+        .toList();
+    debugPrint("selected index: $selectedIndex");
     setState(() {
       widget.onUpdateSelection(selectedAsset);
     });
   }
 
-  _fetchNewMedia() async {
+  Future<void> _fetchNewMedia() async {
     lastPage = currentPage;
-    var result = await PhotoManager.requestPermission();
-    if (result) {
+    PermissionState result = await PhotoManager.requestPermissionExtend();
+    if (result.hasAccess) {
       // success
       //load the media list
-      int nbOfImage = widget.album.assetCount;
+      int nbOfImage = await widget.album.assetCountAsync;
 
       int nbOfPage = (nbOfImage / AlbumViewer.pagesize).ceil();
       if (currentPage < nbOfPage) {
-        List<AssetEntity> media = await widget.album.getAssetListPaged((nbOfPage - 1) - currentPage, AlbumViewer.pagesize);
+        List<AssetEntity> media = await widget.album.getAssetListPaged(
+            page: (nbOfPage - 1) - currentPage, size: AlbumViewer.pagesize);
 
         media = media.reversed.toList();
-        media.removeWhere((element) => element.type == AssetType.video);
-        while (media.length < AlbumViewer.pagesize && currentPage + 1 < nbOfPage) {
+        media.removeWhere(
+            (AssetEntity element) => element.type == AssetType.video);
+        while (
+            media.length < AlbumViewer.pagesize && currentPage + 1 < nbOfPage) {
           currentPage++;
-          List<AssetEntity> newMedia = await widget.album.getAssetListPaged((nbOfPage - 1) - currentPage, AlbumViewer.pagesize);
+          List<AssetEntity> newMedia = await widget.album.getAssetListPaged(
+              page: (nbOfPage - 1) - currentPage, size: AlbumViewer.pagesize);
           newMedia = newMedia.reversed.toList();
-          newMedia.removeWhere((element) => element.type == AssetType.video);
+          newMedia.removeWhere(
+              (AssetEntity element) => element.type == AssetType.video);
           media.addAll(newMedia);
         }
 
@@ -336,16 +394,19 @@ class _AssetSelectorState extends State<AssetSelector> {
 
         for (int i = 0; i < media.length; i++) {
           temp.add(FutureBuilder(
-            future: media[i].thumbDataWithSize(AlbumViewer.thumbnailSize, AlbumViewer.thumbnailSize),
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.done) {
+            future: media[i].thumbnailDataWithSize(ThumbnailSize(
+                AlbumViewer.thumbnailSize, AlbumViewer.thumbnailSize)),
+            builder:
+                (BuildContext context, AsyncSnapshot<Uint8List?> snapshot) {
+              if (snapshot.connectionState == ConnectionState.done &&
+                  snapshot.data != null) {
                 return InkWell(
                   onTap: () => onSelect(i + indexStart, media[i]),
                   child: Container(
                     width: 100,
                     height: 100,
                     child: Image.memory(
-                      snapshot.data,
+                      snapshot.data!,
                       fit: BoxFit.cover,
                     ),
                     decoration: BoxDecoration(
@@ -389,16 +450,16 @@ class _AssetSelectorState extends State<AssetSelector> {
     return NotificationListener<ScrollNotification>(
         onNotification: (ScrollNotification scroll) {
           _handleScrollEvent(scroll);
-          return;
+          return false;
         },
         child: AssetGrid(_mediaList, selectedIndexes));
   }
 }
 
 class AssetGrid extends StatelessWidget {
+  const AssetGrid(this._mediaList, this.selectedIndexes, {super.key = null});
   final List<Widget> _mediaList;
   final List<int> selectedIndexes;
-  const AssetGrid(this._mediaList, this.selectedIndexes, {Key key}) : super(key: key);
 
   //the width of the border of the selected image
   static const double widthBorder = 2;
@@ -415,15 +476,22 @@ class AssetGrid extends StatelessWidget {
               childAspectRatio: 1.0,
             ),
             itemCount: _mediaList.length,
-            itemBuilder: (context, index) {
+            itemBuilder: (BuildContext context, int index) {
               return Container(
                 height: 105,
                 width: 105,
-                child: ClipRRect(borderRadius: BorderRadius.circular(borderRadius), child: _mediaList[index]),
+                child: ClipRRect(
+                    borderRadius: BorderRadius.circular(borderRadius),
+                    child: _mediaList[index]),
                 decoration: BoxDecoration(
                   color: Theme.of(context).colorScheme.surface,
-                  border: Border.all(color: selectedIndexes.contains(index) ? Theme.of(context).colorScheme.secondary : Theme.of(context).colorScheme.background, width: widthBorder),
-                  borderRadius: BorderRadius.circular(borderRadius + widthBorder),
+                  border: Border.all(
+                      color: selectedIndexes.contains(index)
+                          ? Theme.of(context).colorScheme.secondary
+                          : Theme.of(context).colorScheme.surface,
+                      width: widthBorder),
+                  borderRadius:
+                      BorderRadius.circular(borderRadius + widthBorder),
                 ),
               );
             })
